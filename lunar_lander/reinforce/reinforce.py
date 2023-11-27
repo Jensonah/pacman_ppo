@@ -124,6 +124,11 @@ def plot_fancy_loss(window_size, loss,path):
 	# A sliding window that keeps track of the average, minimum and maximum loss
 	# Given an array of length N, outputs an array of length N - 2*window_size
 	# We do not do padding of any sorts to keep the output array the same length as the input array
+	# Complexity is O(N*window_size)
+	#
+	# I feel like the min and max could be found in lower time complexity 
+	# but given that this function takes up little of the total runtime, 
+	# I focus on other things
 	def get_plot_data(window_size, loss):
 
 		loss = np.array(loss)
@@ -140,8 +145,8 @@ def plot_fancy_loss(window_size, loss,path):
 
 			sum_window -= loss[i-window_size]
 			sum_window += loss[i]
-			min_window = min(min_window, loss[i])
-			max_window = max(max_window, loss[i])
+			min_window = loss[i - window_size:i].min()
+			max_window = loss[i - window_size:i].max()
 
 			data.append((sum_window/window_size, min_window, max_window))
 
@@ -226,7 +231,7 @@ env = gym.make(lunar_lander_hyperparameters["env_name"],
 
 base_path = f"trial_data/trial_{lunar_lander_hyperparameters['trial_number']}"
 
-env = gym.wrappers.RecordVideo(env, f"{base_path}/video/", episode_trigger=lambda t: t % 99 == 0)
+env = gym.wrappers.RecordVideo(env, f"{base_path}/video/", episode_trigger=lambda t: t % 100 == 99)
 
 model = Pilot(lunar_lander_hyperparameters["state_size"],
 			  lunar_lander_hyperparameters["fc1"],
