@@ -179,7 +179,7 @@ def plot_fancy_loss(window_size, loss,path):
 	# Set labels
 	plt.title(f'Loss projection')
 	plt.xlabel('Episode No.')
-	plt.ylabel(f'Average sliding window, (size {window_size})')
+	plt.ylabel(f'Average sliding window (size {window_size})')
 	plt.legend(['My reinforce implementation'])#, 'PPO for Beginners'])
 	# Show graph so user can screenshot
 	plt.savefig(path)
