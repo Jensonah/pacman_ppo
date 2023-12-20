@@ -12,8 +12,8 @@ from pathlib import Path
 
 
 lunar_lander_hyperparameters = {
-	"num_episodes" : 2000,
-	"beta" : 0.4,
+	"num_episodes" : 2500,
+	"beta" : 0.9,
 	"gamma" : 0.99,
 	"lr_actor" : 1e-3,
 	"lr_critic" : 1e-3,
@@ -24,7 +24,7 @@ lunar_lander_hyperparameters = {
 	"fc1" : 120,
 	"fc2" : 240,
 	"fc3" : 120,
-	"trial_number" : 26,
+	"trial_number" : 33,
 	"device" : "cpu",
 	"sliding_window_size" : 25
 }
@@ -63,10 +63,10 @@ class Pilot(nn.Module):
 
 	def act(self, state):
 
-		#state = torch.from_numpy(state).float().unsqueeze(0).to(device)
 		probabilities = self.forward(state)
 		probs = Categorical(probabilities)
 		action = probs.sample()
+
 		return action.item(), probs.log_prob(action)
 	
 
@@ -93,8 +93,6 @@ class CoPilot(nn.Module):
 
 		x = self.fc4(x)
 		x = F.sigmoid(x)
-		# Linear activation necessary for Q-values
-		# Sigmoid seemed to improve performance
 
 		return x
 	
@@ -117,26 +115,20 @@ def normalize_state(state):
 def get_episode(env, model):
 
 	episode = []
-
-	# the library technically returns a state observation, but in 
-	# our case the state and the state observation are equal
-	state, info = env.reset(seed=42) # TODO: remove seed
-	state = normalize_state(state)
-	state = torch.from_numpy(state).float().unsqueeze(0).to(device)
-
 	terminated = False
 	truncated = False
 
-	# the library should already include penalties for terminated, for truncated there is no need
+	new_state, info = env.reset() # TODO: remove seed
+	
 	while not (terminated or truncated):
+
+		state = normalize_state(new_state)
+		state = torch.from_numpy(state).float().unsqueeze(0).to(device)
 		
 		action, log_probs = model.act(state)
 
-		state, reward, terminated, truncated, info = env.step(action)
-		state = normalize_state(state)
-		state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+		new_state, reward, terminated, truncated, info = env.step(action)
 
-		# TODO: Maybe add truncated here
 		episode.append((state, log_probs, reward))
 
 	return episode
@@ -187,15 +179,13 @@ def train(num_episodes, env, actor, critic, optim_actor, optim_critic, beta, gam
 		for t in range(len(episode)):
 
 			V_t = critic_value[t]
-			V_t1 = critic_value[min(t+1, len(episode)-1)] # safe indexing
+			V_t1 = critic_value[t+1] if t < len(episode) - 1 else 0 # safe indexing
+			advantage = gamma*V_t1 + rewards[t] - V_t
 
 			# negative because torch implements gradient descent
-			gradients_actor.append(-beta*log_probs[t]*(V_t + rewards[t])) # we can add rewards[t] in here
+			gradients_actor.append(-beta*log_probs[t]*advantage) # we can add rewards[t] in here, minus necessary here?
 
-			# this should be mse...
-			gradients_critic.append((gamma*V_t1 + rewards[t] - V_t)**2)
-
-			# What are the other variables in the pseudocode?
+			gradients_critic.append(advantage**2)
 
 		# Both update functions use "expected_rewards[t] - V_s" in their update pass
 		# pytorch creates behind the scenes creates computation graphs (maybe look up a course of the inner workings of pytorch)
@@ -209,10 +199,6 @@ def train(num_episodes, env, actor, critic, optim_actor, optim_critic, beta, gam
 		critic_losses.append(critic_loss.detach())
 
 	return obj_func_hist, actor_losses, critic_losses
-
-
-# mean squared loss should be cool
-
 
 
 def plot_fancy_loss(window_size, loss,path):
