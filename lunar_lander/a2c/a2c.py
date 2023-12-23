@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 lunar_lander_hyperparameters = {
-	"num_episodes" : 2500,
+	"num_episodes" : 1500,
 	"beta" : 0.9,
 	"gamma" : 0.99,
 	"lr_actor" : 1e-3,
@@ -24,7 +24,7 @@ lunar_lander_hyperparameters = {
 	"fc1" : 120,
 	"fc2" : 240,
 	"fc3" : 120,
-	"trial_number" : 33,
+	"trial_number" : 34,
 	"device" : "cpu",
 	"sliding_window_size" : 25
 }
@@ -159,8 +159,7 @@ def update_net(gradients, optim, retain):
 def train(num_episodes, env, actor, critic, optim_actor, optim_critic, beta, gamma):
 
 	obj_func_hist = []
-	actor_losses = []
-	critic_losses = []
+	losses = []
 
 	for _ in tqdm(range(num_episodes), desc="Epochs"):
 
@@ -192,16 +191,15 @@ def train(num_episodes, env, actor, critic, optim_actor, optim_critic, beta, gam
 		# and zero grad removes these then, which then causes a bug when we want to update the critic
 		# we could also have summed to losses together and then updated on the actor?
 
-		actor_loss = update_net(gradients_actor, optim_actor, retain=True)
-		critic_loss = update_net(gradients_critic, optim_critic, retain=False)
+		gradient = gradients_actor + gradients_critic
+		loss = update_net(gradient, optim_actor, retain=True)
 
-		actor_losses.append(actor_loss.detach())
-		critic_losses.append(critic_loss.detach())
+		losses.append(loss.detach())
 
-	return obj_func_hist, actor_losses, critic_losses
+	return obj_func_hist, losses
 
 
-def plot_fancy_loss(window_size, loss,path):
+def plot_fancy_loss(window_size, loss, path):
 
 	# A sliding window that keeps track of the average, minimum and maximum loss
 	# Given an array of length N, outputs an array of length N - 2*window_size
@@ -298,14 +296,14 @@ critic = CoPilot(lunar_lander_hyperparameters["state_size"],
 
 optimizer_critic = optim.Adam(critic.parameters(), lr=lunar_lander_hyperparameters["lr_critic"])
 
-obj_func_hist, actor_loss, critic_loss = train(num_episodes, 
-												env, 
-												actor,
-												critic, 
-												optimizer_actor,
-												optimizer_critic, 
-												lunar_lander_hyperparameters["beta"],
-												lunar_lander_hyperparameters["gamma"])
+obj_func_hist, losses = train(num_episodes, 
+								env, 
+								actor,
+								critic, 
+								optimizer_actor,
+								optimizer_critic, 
+								lunar_lander_hyperparameters["beta"],
+								lunar_lander_hyperparameters["gamma"])
 
 
 with open(f'{base_path}/hyperparameters.txt', 'w') as f:
@@ -321,8 +319,7 @@ plot_fancy_loss(lunar_lander_hyperparameters["sliding_window_size"],
 				f"{base_path}/loss_pretty.png")
 
 
-plot_ugly_loss(actor_loss, num_episodes, "actor_")
-plot_ugly_loss(critic_loss, num_episodes, "critic_")
+plot_ugly_loss(losses, num_episodes, "actor_")
 
 torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
 torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
