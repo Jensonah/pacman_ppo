@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 lunar_lander_hyperparameters = {
-	"num_episodes" : 1500,
+	"num_episodes" : 2000,
 	"beta" : 0.9,
 	"gamma" : 0.99,
 	"lr_actor" : 1e-3,
@@ -24,7 +24,7 @@ lunar_lander_hyperparameters = {
 	"fc1" : 120,
 	"fc2" : 240,
 	"fc3" : 120,
-	"trial_number" : 34,
+	"trial_number" : 35,
 	"device" : "cpu",
 	"sliding_window_size" : 25
 }
@@ -111,7 +111,6 @@ def normalize_state(state):
 	return state
 
 
-
 def get_episode(env, model):
 
 	episode = []
@@ -144,7 +143,6 @@ def get_standardized_tensor(xs):
 	return (xs - xs.mean()) / (xs.std() + eps)
 
 
-
 def update_net(gradients, optim, retain):
 	
 	policy_loss = torch.cat(gradients).sum()
@@ -153,7 +151,6 @@ def update_net(gradients, optim, retain):
 	optim.step()
 
 	return policy_loss
-
 
 
 def train(num_episodes, env, actor, critic, optim_actor, optim_critic, beta, gamma):

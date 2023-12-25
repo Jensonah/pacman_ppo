@@ -1,0 +1,1 @@
+{'num_episodes': 2000, 'beta': 0.9, 'gamma': 0.99, 'lr_actor': 0.001, 'lr_critic': 0.001, 'env_name': 'LunarLander-v2', 'render_mode': 'rgb_array', 'state_size': 8, 'action_size': 4, 'fc1': 120, 'fc2': 240, 'fc3': 120, 'trial_number': 35, 'device': 'cpu', 'sliding_window_size': 25}

@@ -9,8 +9,6 @@ import gymnasium as gym
 from tqdm import tqdm
 from pathlib import Path
 
-torch.autograd.set_detect_anomaly(True)
-
 
 class Actor(nn.Module):
 
@@ -46,7 +44,8 @@ class Actor(nn.Module):
 		probabilities = self.forward(state)
 		probs = Categorical(probabilities)
 		action = probs.sample()
-		return action.item(), probs.log_prob(action)
+		# TODO: log_prob or normal prob? Paper says normal prob...
+		return action.item(), probs.log_prob(action).exp()
 	
 
 class Critic(nn.Module):
@@ -113,25 +112,36 @@ def collect_episode(env, model):
 	return episode
 
 
+# index probability of action taken at sampling time with current updated model
 def get_probs(actor, states, actions):
 	all_probs = torch.cat([actor.forward(state) for state in states])
-	out = [all_probs[i][actions[i]].unsqueeze(0) for i in range(len(actions))]
-	out = torch.cat(out)
+	actions = torch.Tensor(actions).int()
+	out = all_probs[torch.arange(all_probs.size(0)), actions]
+	# these lines do this below more efficient
+	#[all_probs[i][actions[i]].unsqueeze(0) for i in range(len(actions))]
 	return out
-	# index probability of action taken at sampling time
 
 
-def update_net(gradients, optim, retain):
+def update_net(gradients, optim):
 	
 	policy_loss = gradients.sum()
 	optim.zero_grad()
-	policy_loss.backward(retain_graph=retain)
+	policy_loss.backward()
 	optim.step()
 
 	return policy_loss
 
 
-def train(env, actor, critic, optim_actor, optim_critic, num_episodes, num_actors, num_epochs, eps, gamma):
+def get_standardized_tensor(xs):
+
+	## eps is the smallest representable float, which is 
+	# added to the standard deviation of the returns to avoid numerical instabilities   
+	eps = np.finfo(np.float32).eps.item()     
+	xs = torch.tensor(xs)
+	return (xs - xs.mean()) / (xs.std() + eps)
+
+
+def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, gamma):
 
 	# One style of policy gradient implementation, popularized in [Mni+16] and well-suited for use
 	# with recurrent neural networks, runs the policy for T timesteps (where T is much less than the
@@ -142,9 +152,14 @@ def train(env, actor, critic, optim_actor, optim_critic, num_episodes, num_actor
 	obj_func_hist = []
 	losses = []
 
-	for i in tqdm(range(num_episodes)):
+	for _ in tqdm(range(num_episodes)):
 
 		episodes = [collect_episode(env, actor) for _ in range(num_actors)]
+
+		sum_tuples = 0
+		for episode in episodes:
+			sum_tuples += len(episode)
+
 		'''
 		In other implementations the data is not a collection of varying length concluded episodes,
 		but instead an array of i*j, where j is a fixed number of steps.
@@ -157,6 +172,11 @@ def train(env, actor, critic, optim_actor, optim_critic, num_episodes, num_actor
 		original_probs  = [torch.cat([prob for _, _, prob, _ in episode]) for episode in episodes]
 		rewards = [[reward for _, _, _, reward in episode] for episode in episodes]
 
+		cum_rewards = np.array([sum(episode) for episode in rewards])
+		obj_func_hist.append((cum_rewards.mean(), cum_rewards.min(), cum_rewards.max()))
+
+		rewards = [get_standardized_tensor(reward).unsqueeze(1) for reward in rewards]
+
 		for k in range(num_epochs):
 
 			actor_gradient = torch.empty(0)
@@ -164,43 +184,38 @@ def train(env, actor, critic, optim_actor, optim_critic, num_episodes, num_actor
 
 			for j in range(num_actors):
 
-				critic_values_t  = torch.cat([critic.forward(state) for state in states[j]])
-				critic_values_t_copy = critic_values_t.clone()
-				critic_values_t1 = torch.cat((critic_values_t_copy[1:], torch.zeros(1,1)))
+				critic_values_t  = torch.cat([critic(state) for state in states[j]])
+				critic_values_t1 = torch.cat((critic_values_t.clone()[1:], torch.zeros(1,1)))
 
-				rewards_j = torch.FloatTensor(rewards[j]).unsqueeze(1)
-
-				advantage = gamma*critic_values_t1 + rewards_j - critic_values_t # again make sure element wise
-
-				original_probs_j = original_probs[j].clone()
+				advantage = gamma*critic_values_t1 + rewards[j] - critic_values_t 
+				#advantage *= -1 # flipping because torch minimizes
 
 				# we need the probability for each action
 				if k == 0:
-					actor_probs = original_probs_j
+					actor_probs = original_probs[j].clone()
+					original_probs[j] = original_probs[j].detach()
 				else:
+					# we can also always do this and detach already all above
 					actor_probs = get_probs(actor, states[j], actions[j])
-				
-				difference_grad = torch.div(actor_probs, original_probs_j).unsqueeze(1) # Make sure that this is element wise 
+
+				difference_grad = torch.div(actor_probs, original_probs[j]).unsqueeze(1)
 				# Note that for k = 0 these are all ones, but we keep the calculation such that the
 				# backtracking algorithm can also see this
 				
 				clipped = torch.clamp(difference_grad, 1 - eps, 1 + eps)
-				ppo_gradient = torch.minimum(difference_grad*advantage, clipped*advantage)
 
-				actor_gradient = torch.cat((actor_gradient, ppo_gradient)) # Let's hope the shape remains correct here
+				ppo_gradient = torch.minimum(difference_grad*advantage, clipped*advantage)
+				ppo_gradient *= -1 # this seems to be the right place
+
+				actor_gradient = torch.cat((actor_gradient, ppo_gradient))
 				# we could also include an "entropy" bonus to the actor loss that encourages exploration
 				
-				critic_gradient = torch.cat((critic_gradient, advantage*advantage)) # again make sure that this is element wise
+				critic_gradient = torch.cat((critic_gradient, advantage*advantage))
 
 			# update both models
 			gradient = torch.cat((actor_gradient, critic_gradient))
-			loss = update_net(gradient, optim_actor, retain=True)
-			losses.append(loss)
-
-			print(f"epoch {k} done")
-
-		cum_rewards = np.array([sum(episode) for episode in rewards])
-		obj_func_hist.append(cum_rewards.mean(), cum_rewards.min(), cum_rewards.max())
+			loss = update_net(gradient, optim)
+			losses.append(loss.detach())
 
 	return obj_func_hist, losses
 
@@ -222,24 +237,30 @@ def plot_fancy_loss(data, path):
 	#plt.fill_between(pfb_x_mean, pfb_y_low, pfb_y_high, color='g', alpha=0.3)
 
 	# Set labels
-	plt.title(f'Loss projection')
+	plt.title(f'Reward projection')
 	plt.xlabel('Episode No.')
 	plt.ylabel(f'Reward')
 	plt.legend(['My PPO implementation'])#, 'PPO for Beginners'])\
 	plt.savefig(path)
 
 
+def plot_ugly_loss(data, length, name):
+
+	plt.clf()
+	plt.plot(list(range(length)), data)
+	plt.savefig(f"{base_path}/{name}loss.png")
+
+
 lunar_lander_hyperparameters = {
-	"num_episodes" : 1000,
+	"num_episodes" : 300,
 	"gamma" : 0.99,
-	"lr_actor" : 1e-3,
-	"lr_critic" : 1e-3,
+	"lr" : 1e-3,
 	"env_name" : "LunarLander-v2",
 	"render_mode" : "rgb_array",
-	"trial_number" : 0,
+	"trial_number" : 4,
 	"eps" : 0.2,
 	"num_epochs" : 10,
-	"num_actors" : 10,
+	"num_actors" : 5,
 	"device" : "cpu"
 }
 
@@ -253,17 +274,14 @@ env = gym.wrappers.RecordVideo(env, f"{base_path}/video/", episode_trigger=lambd
 
 actor = Actor(lunar_lander_hyperparameters["device"])
 
-optimizer_actor = optim.Adam(actor.parameters(), lr=lunar_lander_hyperparameters["lr_actor"])
-
 critic = Critic(lunar_lander_hyperparameters["device"])
 
-optimizer_critic = optim.Adam(critic.parameters(), lr=lunar_lander_hyperparameters["lr_critic"])
+optimizer = optim.Adam(list(actor.parameters()) + list(critic.parameters()), lr=lunar_lander_hyperparameters["lr"])
 
 obj_func_hist, losses = train(env,
 							  actor,
 							  critic,
-							  optimizer_actor,
-							  optimizer_critic,
+							  optimizer,
 							  lunar_lander_hyperparameters["num_episodes"],
 							  lunar_lander_hyperparameters["num_actors"],
 							  lunar_lander_hyperparameters["num_epochs"],
@@ -278,7 +296,11 @@ with open(f'{base_path}/hyperparameters.txt', 'w') as f:
 Path(f"{base_path}/save/").mkdir(parents=True, exist_ok=True)
 
 plot_fancy_loss(obj_func_hist,
-				f"{base_path}/loss_pretty.png")
+				f"{base_path}/rewards.png")
+
+plot_ugly_loss(losses,
+			   len(losses),
+			   "total_")
 
 torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
 torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
