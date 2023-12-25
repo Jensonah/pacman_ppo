@@ -252,15 +252,15 @@ def plot_ugly_loss(data, length, name):
 
 
 lunar_lander_hyperparameters = {
-	"num_episodes" : 300,
+	"num_episodes" : 1000,
 	"gamma" : 0.99,
 	"lr" : 1e-3,
 	"env_name" : "LunarLander-v2",
 	"render_mode" : "rgb_array",
-	"trial_number" : 4,
+	"trial_number" : 7,
 	"eps" : 0.2,
-	"num_epochs" : 10,
-	"num_actors" : 5,
+	"num_epochs" : 5,
+	"num_actors" : 3,
 	"device" : "cpu"
 }
 
@@ -304,3 +304,7 @@ plot_ugly_loss(losses,
 
 torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
 torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
+
+# We found that using a gpu does not really speed up our code
+# However we did not optimize our code to do so either
+# We could change our code to train on small batches etc.
