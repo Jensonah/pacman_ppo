@@ -8,148 +8,13 @@ import matplotlib.pyplot as plt
 import gymnasium as gym
 from tqdm import tqdm
 from pathlib import Path
+import time
+import json
 
 
-class Actor(nn.Module):
-
-	def __init__(self, device):
-		super(Actor, self).__init__()
-
-		# (250,160,3)
-		self.conv1 = nn.Conv2d(3, 6, (3,3), groups=1, stride=(2,1))
-		# (125, 160, 6)
-		self.conv2 = nn.Conv2d(6, 6, (3,3), groups=1, stride=(2,2))
-		# (62, 80, 6)
-		self.conv3 = nn.Conv2d(6, 6, (3,3), groups=1, stride=(2,2))
-		# (31, 40, 6)
-		self.conv4 = nn.Conv2d(6, 6, (3,3), groups=1, stride=(2,2))
-		# (15, 20, 6)
-		self.conv5 = nn.Conv2d(6, 6, (3,3), groups=1, stride=(2,2))
-		# (7, 10, 6)
-		self.flat = nn.Flatten()
-		# 7*10*6 = 420
-		self.full = nn.Linear(7*10*6, 5)
-		# 5
-
-		self.device = device
-		
-
-	def forward(self, x):
-
-		x = self.conv1(x)
-		x = F.relu(x)
-
-		x = self.conv2(x)
-		x = F.relu(x)
-
-		x = self.conv3(x)
-		x = F.relu(x)
-
-		x = self.conv4(x)
-		x = F.relu(x)
-
-		x = self.conv5(x)
-		x = F.relu(x)
-		
-		x = self.flat(x)
-
-		x = self.full(x)
-		x = F.softmax(x, dim=1)
-
-		return x
-	
-
-	def act(self, state):
-
-		probabilities = self.forward(state)
-		probs = Categorical(probabilities)
-		action = probs.sample()
-		# PPO paper says to use normal prob here
-		return action.item(), probs.log_prob(action).exp()
-	
-
-class Critic(nn.Module):
-
-	def __init__(self, device):
-		super(Critic, self).__init__()		
-
-		# (250,160,3)
-		self.conv1 = nn.Conv2d(3, 6, (3,3), groups=1, stride=(2,1))
-		# (125, 160, 6)
-		self.conv2 = nn.Conv2d(6, 6, (3,3), groups=1, stride=(2,2))
-		# (62, 80, 6)
-		self.conv3 = nn.Conv2d(6, 6, (3,3), groups=1, stride=(2,2))
-		# (31, 40, 6)
-		self.conv4 = nn.Conv2d(6, 6, (3,3), groups=1, stride=(2,2))
-		# (15, 20, 6)
-		self.conv5 = nn.Conv2d(6, 6, (3,3), groups=1, stride=(2,2))
-		# (7, 10, 6)
-		self.flat = nn.Flatten()
-		# 7*10*6 = 420
-		self.full = nn.Linear(7*10*6, 1)
-		# 1
-
-		self.device = device
-		
-
-	def forward(self, x):
-
-		x = self.conv1(x)
-		x = F.relu(x)
-
-		x = self.conv2(x)
-		x = F.relu(x)
-
-		x = self.conv3(x)
-		x = F.relu(x)
-
-		x = self.conv4(x)
-		x = F.relu(x)
-
-		x = self.conv5(x)
-		x = F.relu(x)
-		
-		x = self.flat(x)
-
-		x = self.full(x)
-		x = F.sigmoid(x, dim=1)
-
-		return x
-
-
-def prepare_data_for_model(state, device):
-
-	state = np.array(state) / 255
-
-	# PyTorch wants the rgb channel first
-	transposed_array = np.transpose(state, (2, 0, 1))
-
-	tensor = torch.from_numpy(transposed_array).float().unsqueeze(0).to(device)
-
-	return tensor
-
-
-def collect_episode(env, model):
-
-	episode = []
-	terminated = False
-	truncated = False
-
-	new_state, info = env.reset()
-	
-	while not (terminated or truncated):
-
-		state = prepare_data_for_model(new_state, actor.device)
-
-		action, probs = model.act(state)
-
-		new_state, reward, terminated, truncated, info = env.step(action)
-
-		reward += info['lives']
-
-		episode.append((state, action, probs, reward))
-
-	return episode
+from base import Actor
+from base import Critic
+from base import collect_episode
 
 
 # index probability of action taken at sampling time with current updated model
@@ -181,6 +46,9 @@ def get_standardized_tensor(xs):
 	return (xs - xs.mean()) / (xs.std() + eps)
 
 
+
+# TODO: make sure the amount of context frames can be a variable 
+# (such that a state consists of the last x frames)
 def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, gamma):
 
 	# One style of policy gradient implementation, popularized in [Mni+16] and well-suited for use
@@ -192,10 +60,15 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 	obj_func_hist = []
 	losses = []
 
+	time_sampling = 0
+	time_updating = 0
+
 	for _ in tqdm(range(num_episodes)):
+		
+		t0 = time.time()
 
 		episodes = [collect_episode(env, actor) for _ in range(num_actors)]
-
+		
 		sum_tuples = 0
 		for episode in episodes:
 			sum_tuples += len(episode)
@@ -217,6 +90,11 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
 		rewards = [get_standardized_tensor(reward).unsqueeze(1) for reward in rewards]
 
+		t1 = time.time()
+
+		time_sampling += t1 - t0
+
+		t0 = time.time()
 		for k in range(num_epochs):
 
 			actor_gradient = torch.empty(0)
@@ -255,6 +133,13 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 			gradient = torch.cat((actor_gradient, critic_gradient))
 			loss = update_net(gradient, optim)
 			losses.append(loss.detach())
+		
+		t1 = time.time()
+
+		time_updating += t1 - t0
+
+	print(f"Total time sampling = {time_sampling}")
+	print(f"Total time updating = {time_updating}")
 
 	return obj_func_hist, losses
 
@@ -291,16 +176,20 @@ def plot_ugly_loss(data, length, name):
 
 
 pacman_hyperparameters = {
-	"num_episodes" : 10,
+	"num_episodes" : 100,
 	"gamma" : 0.99,
 	"lr" : 1e-3,
-	"env_name" : "ALE/Pacman-v5",
+	"env_name" : "ALE/MsPacman-v5",
+	"frameskip" : 4,
+	"repeat_action_probability": 0.2,
 	"render_mode" : "rgb_array",
-	"trial_number" : 1,
+	"trial_number" : 2,
 	"eps" : 0.2,
-	"num_epochs" : 1,
-	"num_actors" : 1,
-	"device" : "cpu"
+	"num_epochs" : 5,
+	"num_actors" : 3,
+	"device" : "cpu",
+	"obs_type" : "rgb",
+	"input_frame_dim" : (3,210,160)
 }
 
 # input (250, 160, 3)
@@ -315,9 +204,11 @@ base_path = f"trial_data/trial_{pacman_hyperparameters['trial_number']}"
 
 env = gym.wrappers.RecordVideo(env, f"{base_path}/video/", episode_trigger=lambda t: t % 100 == 99)
 
-actor = Actor(pacman_hyperparameters["device"])
+actor = Actor(pacman_hyperparameters["device"],
+			  pacman_hyperparameters["input_frame_dim"])
 
-critic = Critic(pacman_hyperparameters["device"])
+critic = Critic(pacman_hyperparameters["device"],
+				pacman_hyperparameters["input_frame_dim"])
 
 optimizer = optim.Adam(list(actor.parameters()) + list(critic.parameters()), lr=pacman_hyperparameters["lr"])
 
@@ -331,9 +222,8 @@ obj_func_hist, losses = train(env,
 							  pacman_hyperparameters["eps"],
 							  pacman_hyperparameters["gamma"])
 
+json.dump(pacman_hyperparameters, open(f"{base_path}/hyperparameters.json",'w'))
 
-with open(f'{base_path}/hyperparameters.txt', 'w') as f:
-    f.write(str(pacman_hyperparameters))
 
 # check if directory exist, if not, make it
 Path(f"{base_path}/save/").mkdir(parents=True, exist_ok=True)
@@ -349,7 +239,3 @@ torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
 torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
 
 env.close()
-
-# We found that using a gpu does not really speed up our code
-# However we did not optimize our code to do so either
-# We could change our code to train on small batches etc.
