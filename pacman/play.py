@@ -25,7 +25,7 @@ def write_image(path, tensor):
 
 
 
-TRIAL_NUMBER = 1
+TRIAL_NUMBER = 2
 
 base_path = f"trial_data/trial_{TRIAL_NUMBER}"
 
@@ -44,7 +44,8 @@ env = gym.make(pacman_hyperparameters["env_name"],
 			   )
 
 actor = Actor(pacman_hyperparameters["device"],
-			  pacman_hyperparameters["input_frame_dim"])
+			  pacman_hyperparameters["input_frame_dim"],
+			  pacman_hyperparameters["no_frames"])
 
 checkpoint = torch.load(f"{base_path}/save/actor_weights.pt")
 
@@ -56,8 +57,8 @@ episode = collect_episode(env, actor)
 states_path = f"{base_path}/states/"
 Path(states_path).mkdir(parents=True, exist_ok=True)
 
-# for i in range(len(episode)):
-# 	if i % 1 == 0:
-# 		write_image(f"{states_path}state_{i}.jpg", episode[i][0])
+for i in range(len(episode)):
+	if i % 1 == 0:
+		write_image(f"{states_path}state_{i}.jpg", episode[i][0])
 
 env.close()

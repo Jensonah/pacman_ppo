@@ -175,8 +175,9 @@ def plot_ugly_loss(data, length, name):
 	plt.savefig(f"{base_path}/{name}loss.png")
 
 
+# 3 HOUR TRAINING TIME?????
 pacman_hyperparameters = {
-	"num_episodes" : 100,
+	"num_episodes" : 1,
 	"gamma" : 0.99,
 	"lr" : 1e-3,
 	"env_name" : "ALE/MsPacman-v5",
@@ -186,10 +187,11 @@ pacman_hyperparameters = {
 	"trial_number" : 2,
 	"eps" : 0.2,
 	"num_epochs" : 5,
-	"num_actors" : 3,
+	"num_actors" : 1,
 	"device" : "cpu",
 	"obs_type" : "rgb",
-	"input_frame_dim" : (3,210,160)
+	"input_frame_dim" : (3,210,160),
+	"no_frames" : 5 # how many frames the model can look back (all frames given to model input)
 }
 
 # input (250, 160, 3)
@@ -205,10 +207,12 @@ base_path = f"trial_data/trial_{pacman_hyperparameters['trial_number']}"
 env = gym.wrappers.RecordVideo(env, f"{base_path}/video/", episode_trigger=lambda t: t % 100 == 99)
 
 actor = Actor(pacman_hyperparameters["device"],
-			  pacman_hyperparameters["input_frame_dim"])
+			  pacman_hyperparameters["input_frame_dim"],
+			  pacman_hyperparameters["no_frames"])
 
 critic = Critic(pacman_hyperparameters["device"],
-				pacman_hyperparameters["input_frame_dim"])
+				pacman_hyperparameters["input_frame_dim"],
+				pacman_hyperparameters["no_frames"])
 
 optimizer = optim.Adam(list(actor.parameters()) + list(critic.parameters()), lr=pacman_hyperparameters["lr"])
 
