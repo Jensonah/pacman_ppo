@@ -140,10 +140,6 @@ def collect_episode(env, model):
 	terminated = False
 	truncated = False
 
-	state_repr = deque()
-
-	# (rgb, x, y) + (no_frames, )
-
 	# (rgb, x, y) -> (no_frames*rgb, x, y)
 	dim = (model.input_frame_dim[0]*(model.no_frames-1),) + model.input_frame_dim[1:]
 
@@ -159,11 +155,11 @@ def collect_episode(env, model):
 
 		new_state = state_to_normalized_tensor(new_state, model.device)
 		state_repr = torch.cat((state_repr, new_state))
-		# (9,210,160)
+		model_ready_state = state_repr.unsqueeze(0)
 
 		# do we need .copy() here? if not does it cause bugs?
 
-		action, probs = model.act(state_repr.unsqueeze(0))
+		action, probs = model.act(model_ready_state)
 
 		new_state, reward, terminated, truncated, info = env.step(action)
 
@@ -175,7 +171,7 @@ def collect_episode(env, model):
 			# now we just give a penalty when he dies
 			reward -= 100
 
-		episode.append((state_repr, action, probs, reward))
+		episode.append((model_ready_state, action, probs, reward))
 
 		# 3 because we work with rgb, could also polished by integrating into hyperpars
 		# we pop the last frame here
