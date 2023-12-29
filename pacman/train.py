@@ -1,8 +1,5 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-from torch.distributions import Categorical
 import numpy as np
 import matplotlib.pyplot as plt
 import gymnasium as gym
@@ -57,6 +54,9 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 	# estimator that does not look beyond timestep T .
 	# Don't we already have this? Think about this. Or isn't that the entire idea of the estimator?
 
+	assert actor.device == critic.device
+	device = actor.device
+
 	obj_func_hist = []
 	losses = []
 
@@ -88,7 +88,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 		cum_rewards = np.array([sum(episode) for episode in rewards])
 		obj_func_hist.append((cum_rewards.mean(), cum_rewards.min(), cum_rewards.max()))
 
-		rewards = [get_standardized_tensor(reward).unsqueeze(1) for reward in rewards]
+		rewards = [get_standardized_tensor(reward).unsqueeze(1).to(device) for reward in rewards]
 
 		t1 = time.time()
 
@@ -97,13 +97,13 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 		t0 = time.time()
 		for k in range(num_epochs):
 
-			actor_gradient = torch.empty(0)
-			critic_gradient = torch.empty(0)
+			actor_gradient = torch.empty(0).to(device)
+			critic_gradient = torch.empty(0).to(device)
 
 			for j in range(num_actors):
 
 				critic_values_t  = torch.cat([critic(state) for state in states[j]])
-				critic_values_t1 = torch.cat((critic_values_t.clone()[1:], torch.zeros(1,1)))
+				critic_values_t1 = torch.cat((critic_values_t.clone()[1:], torch.zeros(1,1).to(device)))
 
 				advantage = gamma*critic_values_t1 + rewards[j] - critic_values_t
 
@@ -132,7 +132,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 			# update both models
 			gradient = torch.cat((actor_gradient, critic_gradient))
 			loss = update_net(gradient, optim)
-			losses.append(loss.detach())
+			losses.append(loss.detach().cpu())
 		
 		t1 = time.time()
 
@@ -177,21 +177,21 @@ def plot_ugly_loss(data, length, name):
 
 # 3 HOUR TRAINING TIME?????
 pacman_hyperparameters = {
-	"num_episodes" : 1,
+	"num_episodes" : 100,
 	"gamma" : 0.99,
 	"lr" : 1e-3,
 	"env_name" : "ALE/MsPacman-v5",
 	"frameskip" : 4,
 	"repeat_action_probability": 0.2,
 	"render_mode" : "rgb_array",
-	"trial_number" : 2,
+	"trial_number" : 3,
 	"eps" : 0.2,
 	"num_epochs" : 5,
-	"num_actors" : 1,
-	"device" : "cpu",
+	"num_actors" : 3,
+	"device" : "cuda",
 	"obs_type" : "rgb",
 	"input_frame_dim" : (3,210,160),
-	"no_frames" : 5 # how many frames the model can look back (all frames given to model input)
+	"no_frames" : 3 # how many frames the model can look back (all frames given to model input)
 }
 
 # input (250, 160, 3)
@@ -209,10 +209,12 @@ env = gym.wrappers.RecordVideo(env, f"{base_path}/video/", episode_trigger=lambd
 actor = Actor(pacman_hyperparameters["device"],
 			  pacman_hyperparameters["input_frame_dim"],
 			  pacman_hyperparameters["no_frames"])
+actor.to(actor.device)
 
 critic = Critic(pacman_hyperparameters["device"],
 				pacman_hyperparameters["input_frame_dim"],
 				pacman_hyperparameters["no_frames"])
+critic.to(critic.device)
 
 optimizer = optim.Adam(list(actor.parameters()) + list(critic.parameters()), lr=pacman_hyperparameters["lr"])
 

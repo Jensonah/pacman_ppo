@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 import numpy as np
-from collections import deque
+
 
 class Actor(nn.Module):
 
@@ -157,8 +157,6 @@ def collect_episode(env, model):
 		state_repr = torch.cat((state_repr, new_state))
 		model_ready_state = state_repr.unsqueeze(0)
 
-		# do we need .copy() here? if not does it cause bugs?
-
 		action, probs = model.act(model_ready_state)
 
 		new_state, reward, terminated, truncated, info = env.step(action)
@@ -171,6 +169,9 @@ def collect_episode(env, model):
 			# now we just give a penalty when he dies
 			reward -= 100
 
+		# in this current implementation we save each frame no_frames times
+		# this is a major driver of memory usage
+		# this can of course be improved, it would require some more serious refactoring however
 		episode.append((model_ready_state, action, probs, reward))
 
 		# 3 because we work with rgb, could also polished by integrating into hyperpars
