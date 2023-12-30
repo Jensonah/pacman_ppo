@@ -205,7 +205,7 @@ pacman_hyperparameters = {
 	"obs_type" : "rgb",
 	"input_frame_dim" : (3,210,160),
 	"no_frames" : 3, # how many frames the model can look back (all frames given to model input)
-	"scale" : 2, # how much we scale down the image in both dimensions
+	"scale" : 2, # how much we scale down the image in both x and y dimensions
 }
 
 dim = pacman_hyperparameters["input_frame_dim"]
