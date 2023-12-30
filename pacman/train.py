@@ -15,23 +15,14 @@ from base import collect_episode
 
 
 # index probability of action taken at sampling time with current updated model
-def get_probs(actor, states, actions):
-	all_probs = torch.cat([actor.forward(state) for state in states])
+def get_probs(actor, frames, actions):
+	#all_probs = torch.cat([actor.forward(state) for state in states])
+	all_probs = torch.cat([actor.forward(get_state(i, frames, actor)) for i in range(len(frames))])
 	actions = torch.Tensor(actions).int()
 	out = all_probs[torch.arange(all_probs.size(0)), actions]
 	# these lines do this below more efficient
 	#[all_probs[i][actions[i]].unsqueeze(0) for i in range(len(actions))]
 	return out
-
-
-def update_net(gradients, optim):
-	
-	policy_loss = gradients.sum()
-	optim.zero_grad()
-	policy_loss.backward()
-	optim.step()
-
-	return policy_loss
 
 
 def get_standardized_tensor(xs):
@@ -41,6 +32,26 @@ def get_standardized_tensor(xs):
 	eps = np.finfo(np.float32).eps.item()     
 	xs = torch.tensor(xs)
 	return (xs - xs.mean()) / (xs.std() + eps)
+
+
+# from the array of frames this function constructs the state at time step i
+def get_state(i, frames, model):
+
+	device = model.device
+	no_frames = model.no_frames
+	frame_dim = model.input_frame_dim
+
+	no_empty_frames = no_frames - i - 1 # i = 0 & no_frames = 3 -> = 2 
+	left_idx = max(0, i - no_frames + 1)# i = 0 & no_frames = 3 -> = 0
+	right_idx = i + 1
+
+	frames_tensor = torch.cat((frames[left_idx:right_idx]))
+
+	if no_empty_frames > 0:
+		zeros = torch.zeros(3*no_empty_frames, frame_dim[1], frame_dim[2]).to(device)
+		frames_tensor = torch.cat((zeros, frames_tensor))
+	
+	return frames_tensor.unsqueeze(0)
 
 
 
@@ -55,6 +66,9 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 	# Don't we already have this? Think about this. Or isn't that the entire idea of the estimator?
 
 	assert actor.device == critic.device
+	assert actor.no_frames == critic.no_frames
+	assert actor.input_frame_dim == critic.input_frame_dim
+
 	device = actor.device
 
 	obj_func_hist = []
@@ -68,10 +82,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 		t0 = time.time()
 
 		episodes = [collect_episode(env, actor) for _ in range(num_actors)]
-		
-		sum_tuples = 0
-		for episode in episodes:
-			sum_tuples += len(episode)
+
 
 		'''
 		In other implementations the data is not a collection of varying length concluded episodes,
@@ -80,7 +91,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 		with possibly the last one being truncated.
 		'''
 
-		states = [[state for state, _, _, _ in episode] for episode in episodes]
+		frames = [[frame for frame, _, _, _ in episode] for episode in episodes]
 		actions = [[action for _, action, _, _ in episode] for episode in episodes]
 		original_probs  = [torch.cat([prob for _, _, prob, _ in episode]) for episode in episodes]
 		rewards = [[reward for _, _, _, reward in episode] for episode in episodes]
@@ -97,13 +108,15 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 		t0 = time.time()
 		for k in range(num_epochs):
 
-			actor_gradient = torch.empty(0).to(device)
-			critic_gradient = torch.empty(0).to(device)
+			loss = 0
 
 			for j in range(num_actors):
+				
+				#states = [get_state(i, frames[j], no_frames, frame_dim) for i in range(len(frames[j]))]
 
-				critic_values_t  = torch.cat([critic(state) for state in states[j]])
-				critic_values_t1 = torch.cat((critic_values_t.clone()[1:], torch.zeros(1,1).to(device)))
+				#critic_values_t  = torch.cat([critic(state) for state in states])
+				critic_values_t  = torch.cat([critic(get_state(i, frames[j], critic)) for i in range(len(frames[j]))])
+				critic_values_t1 = torch.cat((critic_values_t[1:], torch.zeros(1,1).to(device)))
 
 				advantage = gamma*critic_values_t1 + rewards[j] - critic_values_t
 
@@ -113,7 +126,8 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 					original_probs[j] = original_probs[j].detach()
 				else:
 					# we can also always do this and detach already all above
-					actor_probs = get_probs(actor, states[j], actions[j])
+					#actor_probs = get_probs(actor, states, actions[j])
+					actor_probs = get_probs(actor, frames[j], actions[j])
 
 				difference_grad = torch.div(actor_probs, original_probs[j]).unsqueeze(1)
 				# Note that for k = 0 these are all ones, but we keep the calculation such that the
@@ -124,14 +138,13 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 				ppo_gradient = torch.minimum(difference_grad*advantage, clipped*advantage)
 				ppo_gradient *= -1 # this seems to be the right place
 
-				actor_gradient = torch.cat((actor_gradient, ppo_gradient))
+				loss += ppo_gradient.sum() + (advantage**2).sum()
 				# we could also include an "entropy" bonus to the actor loss that encourages exploration
-				
-				critic_gradient = torch.cat((critic_gradient, advantage*advantage))
 
 			# update both models
-			gradient = torch.cat((actor_gradient, critic_gradient))
-			loss = update_net(gradient, optim)
+			optim.zero_grad()
+			loss.backward()
+			optim.step()
 			losses.append(loss.detach().cpu())
 		
 		t1 = time.time()
@@ -177,22 +190,27 @@ def plot_ugly_loss(data, length, name):
 
 # 3 HOUR TRAINING TIME?????
 pacman_hyperparameters = {
-	"num_episodes" : 100,
+	"num_episodes" : 5,
 	"gamma" : 0.99,
 	"lr" : 1e-3,
 	"env_name" : "ALE/MsPacman-v5",
 	"frameskip" : 4,
 	"repeat_action_probability": 0.2,
 	"render_mode" : "rgb_array",
-	"trial_number" : 3,
+	"trial_number" : 6,
 	"eps" : 0.2,
 	"num_epochs" : 5,
-	"num_actors" : 3,
-	"device" : "cuda",
+	"num_actors" : 1,
+	"device" : "cpu",
 	"obs_type" : "rgb",
 	"input_frame_dim" : (3,210,160),
-	"no_frames" : 3 # how many frames the model can look back (all frames given to model input)
+	"no_frames" : 3, # how many frames the model can look back (all frames given to model input)
+	"scale" : 2, # how much we scale down the image in both dimensions
 }
+
+dim = pacman_hyperparameters["input_frame_dim"]
+scale = pacman_hyperparameters["scale"]
+dim = (dim[0], dim[1]//scale, dim[2]//scale)
 
 # input (250, 160, 3)
 # reward float, increases when pacman eats. Further information about reward func unknown
@@ -207,12 +225,12 @@ base_path = f"trial_data/trial_{pacman_hyperparameters['trial_number']}"
 env = gym.wrappers.RecordVideo(env, f"{base_path}/video/", episode_trigger=lambda t: t % 100 == 99)
 
 actor = Actor(pacman_hyperparameters["device"],
-			  pacman_hyperparameters["input_frame_dim"],
+			  dim,
 			  pacman_hyperparameters["no_frames"])
 actor.to(actor.device)
 
 critic = Critic(pacman_hyperparameters["device"],
-				pacman_hyperparameters["input_frame_dim"],
+				dim,
 				pacman_hyperparameters["no_frames"])
 critic.to(critic.device)
 
@@ -230,9 +248,11 @@ obj_func_hist, losses = train(env,
 
 json.dump(pacman_hyperparameters, open(f"{base_path}/hyperparameters.json",'w'))
 
-
 # check if directory exist, if not, make it
 Path(f"{base_path}/save/").mkdir(parents=True, exist_ok=True)
+
+torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
+torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
 
 plot_fancy_loss(obj_func_hist,
 				f"{base_path}/rewards.png")
@@ -240,8 +260,5 @@ plot_fancy_loss(obj_func_hist,
 plot_ugly_loss(losses,
 			   len(losses),
 			   "total_")
-
-torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
-torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
 
 env.close()

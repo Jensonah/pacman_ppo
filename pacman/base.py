@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 import numpy as np
+import cv2
 
 
 class Actor(nn.Module):
@@ -15,20 +16,21 @@ class Actor(nn.Module):
 		# different kernels for each frame
 
 		# (250,160,3) or 210?
-		self.conv1 = nn.Conv2d(3*no_frames,  3*2*no_frames, (3,3), groups=1, stride=(2,1))
+		self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(2,2))
 		# (124, 158, 6) of 121 156
-		self.conv2 = nn.Conv2d(3*2*no_frames, 3*2*no_frames, (3,3), groups=1, stride=(2,2))
+		self.conv2 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(2,2))
 		# (61, 78, 6) of 63 74
-		self.conv3 = nn.Conv2d(3*2*no_frames, 3*2*no_frames, (3,3), groups=1, stride=(2,2))
+		self.conv3 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
 		# (30, 38, 6) why this is 30 and not 29 idk
-		self.conv4 = nn.Conv2d(3*2*no_frames, 3*2*no_frames, (3,3), groups=1, stride=(2,2))
+		self.conv4 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
 		# (14, 18, 6)
-		self.conv5 = nn.Conv2d(3*2*no_frames, 3*2*no_frames, (3,3), groups=1, stride=(2,2))
+		self.conv5 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
 		# (6, 8, 6)
 		self.flat = nn.Flatten()
 		# 6*8*6 = 420
-		self.full = nn.Linear(5*8*3*2*no_frames, 5)
-		# 5
+		self.full1 = nn.Linear(19*13* 3*no_frames, 800)
+		
+		self.full2 = nn.Linear(800, 5)
 
 		self.device = device
 		self.input_frame_dim = input_frame_dim
@@ -51,10 +53,14 @@ class Actor(nn.Module):
 
 		x = self.conv5(x)
 		x = F.relu(x)
-		
+
 		x = self.flat(x)
 
-		x = self.full(x)
+		x = self.full1(x)
+		x = F.relu(x)
+
+		x = self.full2(x)
+		
 		x = F.softmax(x, dim=1)
 
 		return x
@@ -78,21 +84,22 @@ class Critic(nn.Module):
 	def __init__(self, device, input_frame_dim, no_frames):
 		super(Critic, self).__init__()		
 
-		# (250,160,)
-		self.conv1 = nn.Conv2d(3*no_frames,  3*2*no_frames, (3,3), groups=1, stride=(2,1))
-		# (124, 158, ...) of 121 156
-		self.conv2 = nn.Conv2d(3*2*no_frames, 3*2*no_frames, (3,3), groups=1, stride=(2,2))
+		# (250,160,3) or 210?
+		self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(2,2))
+		# (124, 158, 6) of 121 156
+		self.conv2 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(2,2))
 		# (61, 78, 6) of 63 74
-		self.conv3 = nn.Conv2d(3*2*no_frames, 3*2*no_frames, (3,3), groups=1, stride=(2,2))
+		self.conv3 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
 		# (30, 38, 6) why this is 30 and not 29 idk
-		self.conv4 = nn.Conv2d(3*2*no_frames, 3*2*no_frames, (3,3), groups=1, stride=(2,2))
+		self.conv4 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
 		# (14, 18, 6)
-		self.conv5 = nn.Conv2d(3*2*no_frames, 3*2*no_frames, (3,3), groups=1, stride=(2,2))
+		self.conv5 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
 		# (6, 8, 6)
 		self.flat = nn.Flatten()
 		# 6*8*6 = 420
-		self.full = nn.Linear(5*8*3*2*no_frames, 1)
-		# 1
+		self.full1 = nn.Linear(19*13* 3*no_frames, 800)
+		
+		self.full2 = nn.Linear(800, 1)
 
 		self.device = device
 		self.input_frame_dim = input_frame_dim
@@ -115,16 +122,21 @@ class Critic(nn.Module):
 
 		x = self.conv5(x)
 		x = F.relu(x)
-		
+
 		x = self.flat(x)
 
-		x = self.full(x)
+		x = self.full1(x)
+		x = F.relu(x)
+
+		x = self.full2(x)
 		x = F.sigmoid(x)
 
 		return x
 
 
-def state_to_normalized_tensor(state, device):
+def state_to_normalized_tensor(state, device, dim):
+
+	state = cv2.resize(state, (dim[2], dim[1]), interpolation=cv2.INTER_AREA)
 
 	state = np.array(state) / 255
 
@@ -140,10 +152,11 @@ def collect_episode(env, model):
 	terminated = False
 	truncated = False
 
-	# (rgb, x, y) -> (no_frames*rgb, x, y)
-	dim = (model.input_frame_dim[0]*(model.no_frames-1),) + model.input_frame_dim[1:]
+	# (rgb, x, y) -> ((no_frames-1)*rgb, x, y)
+	dim = model.input_frame_dim
+	zeros_dim = (dim[0]*(model.no_frames-1), dim[1], dim[2])
 
-	zeros = torch.from_numpy(np.zeros(dim))
+	zeros = torch.from_numpy(np.zeros(zeros_dim))
 	
 	state_repr = zeros.float().to(model.device)
 
@@ -153,8 +166,8 @@ def collect_episode(env, model):
 	
 	while not (terminated or truncated):
 
-		new_state = state_to_normalized_tensor(new_state, model.device)
-		state_repr = torch.cat((state_repr, new_state))
+		frame = state_to_normalized_tensor(new_state, model.device, dim)
+		state_repr = torch.cat((state_repr, frame))
 		model_ready_state = state_repr.unsqueeze(0)
 
 		action, probs = model.act(model_ready_state)
@@ -169,10 +182,9 @@ def collect_episode(env, model):
 			# now we just give a penalty when he dies
 			reward -= 100
 
-		# in this current implementation we save each frame no_frames times
-		# this is a major driver of memory usage
-		# this can of course be improved, it would require some more serious refactoring however
-		episode.append((model_ready_state, action, probs, reward))
+		# For memory reasons we only save the frame within the state
+		# These can be recovered later, using the functions provided
+		episode.append((frame, action, probs, reward))
 
 		# 3 because we work with rgb, could also polished by integrating into hyperpars
 		# we pop the last frame here

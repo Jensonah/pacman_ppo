@@ -25,12 +25,15 @@ def write_image(path, tensor):
 
 
 
-TRIAL_NUMBER = 3
+TRIAL_NUMBER = 6
 
 base_path = f"trial_data/trial_{TRIAL_NUMBER}"
 
 pacman_hyperparameters = json.load(open(f"{base_path}/hyperparameters.json"))
 
+dim = pacman_hyperparameters["input_frame_dim"]
+scale = pacman_hyperparameters["scale"]
+dim = (dim[0], dim[1]//scale, dim[2]//scale)
 
 # input (210, 160, 3)
 # reward float, increases when pacman eats. Further information about reward func unknown
@@ -44,7 +47,7 @@ env = gym.make(pacman_hyperparameters["env_name"],
 			   )
 
 actor = Actor('cpu',
-			  tuple(pacman_hyperparameters["input_frame_dim"]),
+			  dim,
 			  pacman_hyperparameters["no_frames"])
 
 checkpoint = torch.load(f"{base_path}/save/actor_weights.pt", map_location=torch.device('cpu'))
