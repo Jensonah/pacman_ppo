@@ -190,21 +190,21 @@ def plot_ugly_loss(data, length, name):
 
 # 3 HOUR TRAINING TIME?????
 pacman_hyperparameters = {
-	"num_episodes" : 5,
+	"num_episodes" : 3,
 	"gamma" : 0.99,
 	"lr" : 1e-3,
 	"env_name" : "ALE/MsPacman-v5",
 	"frameskip" : 4,
 	"repeat_action_probability": 0.2,
 	"render_mode" : "rgb_array",
-	"trial_number" : 6,
+	"trial_number" : 3,
 	"eps" : 0.2,
-	"num_epochs" : 5,
-	"num_actors" : 1,
+	"num_epochs" : 10,
+	"num_actors" : 2,
 	"device" : "cpu",
 	"obs_type" : "rgb",
 	"input_frame_dim" : (3,210,160),
-	"no_frames" : 3, # how many frames the model can look back (all frames given to model input)
+	"no_frames" : 2, # how many frames the model can look back (all frames given to model input)
 	"scale" : 2, # how much we scale down the image in both x and y dimensions
 }
 

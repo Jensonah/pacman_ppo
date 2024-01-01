@@ -15,22 +15,23 @@ class Actor(nn.Module):
 		# Reasoning being that on all channels the same kernels will work, and their wouldn't be a need to learn
 		# different kernels for each frame
 
-		# (250,160,3) or 210?
-		self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(2,2))
-		# (124, 158, 6) of 121 156
-		self.conv2 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(2,2))
-		# (61, 78, 6) of 63 74
-		self.conv3 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
-		# (30, 38, 6) why this is 30 and not 29 idk
-		self.conv4 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
-		# (14, 18, 6)
-		self.conv5 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
-		# (6, 8, 6)
-		self.flat = nn.Flatten()
-		# 6*8*6 = 420
-		self.full1 = nn.Linear(19*13* 3*no_frames, 800)
+		self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (5,5), groups=1, stride=(2,2))
 		
-		self.full2 = nn.Linear(800, 5)
+		self.conv2 = nn.Conv2d(3*no_frames, 2*no_frames, (5,5), groups=1, stride=(1,1))
+		
+		self.conv3 = nn.Conv2d(2*no_frames, no_frames, (5,5), groups=1, stride=(1,1))
+		
+		self.conv4 = nn.Conv2d(no_frames, no_frames, (5,5), groups=1, stride=(1,1))
+		
+		self.conv5 = nn.Conv2d(no_frames, 1, (5,5), groups=1, stride=(1,1))
+		
+		self.flat = nn.Flatten()
+		
+		self.full1 = nn.Linear(35*22, 500)
+
+		self.full2 = nn.Linear(500, 100)
+		
+		self.full3 = nn.Linear(100, 5)
 
 		self.device = device
 		self.input_frame_dim = input_frame_dim
@@ -60,7 +61,9 @@ class Actor(nn.Module):
 		x = F.relu(x)
 
 		x = self.full2(x)
-		
+		x = F.relu(x)
+
+		x = self.full3(x)		
 		x = F.softmax(x, dim=1)
 
 		return x
@@ -82,24 +85,29 @@ class Actor(nn.Module):
 class Critic(nn.Module):
 
 	def __init__(self, device, input_frame_dim, no_frames):
-		super(Critic, self).__init__()		
+		super(Critic, self).__init__()
 
-		# (250,160,3) or 210?
-		self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(2,2))
-		# (124, 158, 6) of 121 156
-		self.conv2 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(2,2))
-		# (61, 78, 6) of 63 74
-		self.conv3 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
-		# (30, 38, 6) why this is 30 and not 29 idk
-		self.conv4 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
-		# (14, 18, 6)
-		self.conv5 = nn.Conv2d(3*no_frames, 3*no_frames, (3,3), groups=1, stride=(1,1))
-		# (6, 8, 6)
-		self.flat = nn.Flatten()
-		# 6*8*6 = 420
-		self.full1 = nn.Linear(19*13* 3*no_frames, 800)
+		# In this implementation the previous frames and the different rgb channels are in the same dimension
+		# Reasoning being that on all channels the same kernels will work, and their wouldn't be a need to learn
+		# different kernels for each frame
+
+		self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (5,5), groups=1, stride=(2,2))
 		
-		self.full2 = nn.Linear(800, 1)
+		self.conv2 = nn.Conv2d(3*no_frames, 2*no_frames, (5,5), groups=1, stride=(1,1))
+		
+		self.conv3 = nn.Conv2d(2*no_frames, no_frames, (5,5), groups=1, stride=(1,1))
+		
+		self.conv4 = nn.Conv2d(no_frames, no_frames, (5,5), groups=1, stride=(1,1))
+		
+		self.conv5 = nn.Conv2d(no_frames, 1, (5,5), groups=1, stride=(1,1))
+		
+		self.flat = nn.Flatten()
+
+		self.full1 = nn.Linear(35*22, 500)
+
+		self.full2 = nn.Linear(500, 100)
+		
+		self.full3 = nn.Linear(100, 1)
 
 		self.device = device
 		self.input_frame_dim = input_frame_dim
@@ -129,6 +137,9 @@ class Critic(nn.Module):
 		x = F.relu(x)
 
 		x = self.full2(x)
+		x = F.relu(x)
+
+		x = self.full3(x)
 		x = F.sigmoid(x)
 
 		return x

@@ -60,8 +60,8 @@ episode = collect_episode(env, actor)
 states_path = f"{base_path}/states/"
 Path(states_path).mkdir(parents=True, exist_ok=True)
 
-# for i in range(len(episode)):
-# 	if i % 1 == 0:
-# 		write_image(f"{states_path}state_{i}.jpg", episode[i][0])
+for i in range(len(episode)):
+	if i % 1 == 0:
+		write_image(f"{states_path}state_{i}.jpg", episode[i][0])
 
 env.close()
