@@ -210,7 +210,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 				actor_gradient = torch.cat((actor_gradient, ppo_gradient))
 				# we could also include an "entropy" bonus to the actor loss that encourages exploration
 				
-				critic_gradient = torch.cat((critic_gradient, advantage*advantage))
+				critic_gradient = torch.cat((critic_gradient, 0.5*advantage*advantage))
 
 			# update both models
 			gradient = torch.cat((actor_gradient, critic_gradient))
@@ -252,12 +252,12 @@ def plot_ugly_loss(data, length, name):
 
 
 lunar_lander_hyperparameters = {
-	"num_episodes" : 1000,
+	"num_episodes" : 500,
 	"gamma" : 0.99,
 	"lr" : 1e-3,
 	"env_name" : "LunarLander-v2",
 	"render_mode" : "rgb_array",
-	"trial_number" : 7,
+	"trial_number" : 8,
 	"eps" : 0.2,
 	"num_epochs" : 5,
 	"num_actors" : 3,
