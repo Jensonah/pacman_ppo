@@ -191,7 +191,7 @@ def collect_episode(env, model):
 			# in a previous implementation I always summed the number of current lives to the reward
 			# this resulted in pacman hiding in a corner, as staying alive longer -> more rewards
 			# now we just give a penalty when he dies
-			reward -= 100
+			reward -= 25
 
 		# For memory reasons we only save the frame within the state
 		# These can be recovered later, using the functions provided

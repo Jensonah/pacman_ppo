@@ -140,6 +140,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
 				loss += ppo_gradient.sum() + 0.5*((advantage*advantage).sum())
 				# we could also include an "entropy" bonus to the actor loss that encourages exploration
+				# some paper says that this does not per se help \cite[]
 
 			# update both models
 			optim.zero_grad()

@@ -25,7 +25,7 @@ def write_image(path, tensor):
 
 
 
-TRIAL_NUMBER = 4
+TRIAL_NUMBER = 5
 
 base_path = f"trial_data/trial_{TRIAL_NUMBER}"
 
