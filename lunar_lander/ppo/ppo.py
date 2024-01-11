@@ -72,7 +72,6 @@ class Critic(nn.Module):
 		x = F.relu(x)
 
 		x = self.fc4(x)
-		x = F.sigmoid(x)
 
 		return x
 
@@ -122,16 +121,6 @@ def get_probs(actor, states, actions):
 	return out
 
 
-def update_net(gradients, optim):
-	
-	policy_loss = gradients.sum()
-	optim.zero_grad()
-	policy_loss.backward()
-	optim.step()
-
-	return policy_loss
-
-
 def get_standardized_tensor(xs):
 
 	## eps is the smallest representable float, which is 
@@ -151,6 +140,8 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
 	obj_func_hist = []
 	losses = []
+	ppo_losses = []
+	critic_losses = []
 
 	for _ in tqdm(range(num_episodes)):
 
@@ -179,16 +170,19 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
 		for k in range(num_epochs):
 
-			actor_gradient = torch.empty(0)
-			critic_gradient = torch.empty(0)
+			loss = 0
+			ppo_loss = 0
+			critic_loss = 0
 
 			for j in range(num_actors):
 
 				critic_values_t  = torch.cat([critic(state) for state in states[j]])
 				critic_values_t1 = torch.cat((critic_values_t.clone()[1:], torch.zeros(1,1)))
 
-				advantage = gamma*critic_values_t1 + rewards[j] - critic_values_t 
-				#advantage *= -1 # flipping because torch minimizes
+				# value_state_t == value_state_t1 + reward_t
+				# (advantage) 0 == gamma*critic_values_t1 + rewards[j] - critic_values_t, with gamma == 1
+
+				advantage = gamma*critic_values_t1 + rewards[j] - critic_values_t
 
 				# we need the probability for each action
 				if k == 0:
@@ -207,17 +201,28 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 				ppo_gradient = torch.minimum(difference_grad*advantage, clipped*advantage)
 				ppo_gradient *= -1 # this seems to be the right place
 
-				actor_gradient = torch.cat((actor_gradient, ppo_gradient))
 				# we could also include an "entropy" bonus to the actor loss that encourages exploration
-				
-				critic_gradient = torch.cat((critic_gradient, 0.5*advantage*advantage))
 
-			# update both models
-			gradient = torch.cat((actor_gradient, critic_gradient))
-			loss = update_net(gradient, optim)
+				ppo_loss += torch.mean(ppo_gradient)
+				critic_loss += torch.mean(advantage**2)
+
+				# MAYBE WE SHOULD NORMALISE THESE BY LENGTH! (AVERAGE)
+
+			# don't forget to add += back in later
+			loss = ppo_loss + critic_loss
+
+			optim.zero_grad()
+			loss.backward()
+			optim.step()
+
 			losses.append(loss.detach())
+			ppo_losses.append(ppo_loss.detach())
+			critic_losses.append(critic_loss.detach())
 
-	return obj_func_hist, losses
+
+
+
+	return obj_func_hist, losses, ppo_losses, critic_losses
 
 
 def plot_fancy_loss(data, path):
@@ -257,7 +262,7 @@ lunar_lander_hyperparameters = {
 	"lr" : 1e-3,
 	"env_name" : "LunarLander-v2",
 	"render_mode" : "rgb_array",
-	"trial_number" : 8,
+	"trial_number" : 15,
 	"eps" : 0.2,
 	"num_epochs" : 5,
 	"num_actors" : 3,
@@ -278,7 +283,7 @@ critic = Critic(lunar_lander_hyperparameters["device"])
 
 optimizer = optim.Adam(list(actor.parameters()) + list(critic.parameters()), lr=lunar_lander_hyperparameters["lr"])
 
-obj_func_hist, losses = train(env,
+obj_func_hist, losses, ppo_loss, critic_loss = train(env,
 							  actor,
 							  critic,
 							  optimizer,
@@ -301,6 +306,14 @@ plot_fancy_loss(obj_func_hist,
 plot_ugly_loss(losses,
 			   len(losses),
 			   "total_")
+
+plot_ugly_loss(critic_loss,
+			   len(critic_loss),
+			   "critic_")
+
+plot_ugly_loss(ppo_loss,
+			   len(ppo_loss),
+			   "ppo_")
 
 torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
 torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")

@@ -140,7 +140,6 @@ class Critic(nn.Module):
 		x = F.relu(x)
 
 		x = self.full3(x)
-		x = F.sigmoid(x)
 
 		return x
 

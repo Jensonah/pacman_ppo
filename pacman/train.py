@@ -91,6 +91,11 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 		with possibly the last one being truncated.
 		'''
 
+		# episodes is in the form:
+		# [[(state_0, action_0, probs_0, reward_0), (state_1, action_1, probs_1, reward_1), .., (state_n, action_n, probs_n, reward_n)],
+		#  [(state_0, action_0, probs_0, reward_0), (state_1, action_1, probs_1, reward_1), .., (state_m, action_m, probs_m, reward_m)],
+		#  .., 
+		#  [(state_0, action_0, probs_0, reward_0), (state_1, action_1, probs_1, reward_1), .., (state_o, action_o, probs_o, reward_o)]]
 		frames = [[frame for frame, _, _, _ in episode] for episode in episodes]
 		actions = [[action for _, action, _, _ in episode] for episode in episodes]
 		original_probs  = [torch.cat([prob for _, _, prob, _ in episode]) for episode in episodes]
@@ -106,19 +111,24 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 		time_sampling += t1 - t0
 
 		t0 = time.time()
+
+		# This function can also be sped up by giving smaller 'batches' to the updater,
+		# i.e. updating the models after each actor instead of summing over all actors
+
 		for k in range(num_epochs):
 
 			loss = 0
 
 			for j in range(num_actors):
 				
-				#states = [get_state(i, frames[j], no_frames, frame_dim) for i in range(len(frames[j]))]
-
-				#critic_values_t  = torch.cat([critic(state) for state in states])
 				critic_values_t  = torch.cat([critic(get_state(i, frames[j], critic)) for i in range(len(frames[j]))])
 				critic_values_t1 = torch.cat((critic_values_t[1:], torch.zeros(1,1).to(device)))
 
 				advantage = gamma*critic_values_t1 + rewards[j] - critic_values_t
+
+				# advantage will become zero? Or is it better to say that what we have is not advantage...
+				# so what if we take out the rewards[j]?
+				# and then in the ppo function we use advantage
 
 				# we need the probability for each action
 				if k == 0:
@@ -138,9 +148,11 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 				ppo_gradient = torch.minimum(difference_grad*advantage, clipped*advantage)
 				ppo_gradient *= -1 # this seems to be the right place
 
-				loss += ppo_gradient.sum() + 0.5*((advantage*advantage).sum())
+				# We don’t share parameters between the policy and value
+				# function (so coefficient c1 is irrelevant), and we don’t use an entropy bonus. ~ppo paper
+				loss += torch.mean(ppo_gradient) + torch.mean(advantage**2)
 				# we could also include an "entropy" bonus to the actor loss that encourages exploration
-				# some paper says that this does not per se help \cite[]
+				# some paper says that this does not perse help \cite[]
 
 			# update both models
 			optim.zero_grad()
