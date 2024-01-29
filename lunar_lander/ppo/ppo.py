@@ -180,7 +180,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 				critic_values_t1 = torch.cat((critic_values_t.clone()[1:], torch.zeros(1,1)))
 
 				# value_state_t == value_state_t1 + reward_t
-				# (advantage) 0 == gamma*critic_values_t1 + rewards[j] - critic_values_t, with gamma == 1
+				# (advantage) (no 0)  == gamma*critic_values_t1 + rewards[j] - critic_values_t, with gamma == 1
 
 				advantage = gamma*critic_values_t1 + rewards[j] - critic_values_t
 
@@ -215,9 +215,9 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 			loss.backward()
 			optim.step()
 
-			losses.append(loss.detach())
-			ppo_losses.append(ppo_loss.detach())
-			critic_losses.append(critic_loss.detach())
+			losses.append(loss.detach()/num_actors)
+			ppo_losses.append(ppo_loss.detach()/num_actors)
+			critic_losses.append(critic_loss.detach()/num_actors)
 
 
 
@@ -262,10 +262,10 @@ lunar_lander_hyperparameters = {
 	"lr" : 1e-3,
 	"env_name" : "LunarLander-v2",
 	"render_mode" : "rgb_array",
-	"trial_number" : 15,
+	"trial_number" : 4,
 	"eps" : 0.2,
-	"num_epochs" : 5,
-	"num_actors" : 3,
+	"num_epochs" : 10,
+	"num_actors" : 10,
 	"device" : "cpu"
 }
 

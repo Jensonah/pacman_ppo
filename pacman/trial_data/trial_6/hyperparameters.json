@@ -1,0 +1,1 @@
+{"num_episodes": 400, "gamma": 0.99, "lr": 0.001, "env_name": "ALE/MsPacman-v5", "frameskip": 4, "repeat_action_probability": 0.2, "render_mode": "rgb_array", "trial_number": 6, "eps": 0.2, "num_epochs": 6, "num_actors": 3, "device": "cuda", "obs_type": "rgb", "input_frame_dim": [3, 210, 160], "no_frames": 2, "scale": 2}

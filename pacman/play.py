@@ -25,7 +25,7 @@ def write_image(path, tensor):
 
 
 
-TRIAL_NUMBER = 5
+TRIAL_NUMBER = 6
 
 base_path = f"trial_data/trial_{TRIAL_NUMBER}"
 
@@ -58,7 +58,7 @@ episode = collect_episode(env, actor)
 
 # check if directory exist, if not, make it
 states_path = f"{base_path}/states/"
-Path(states_path).mkdir(parents=True, exist_ok=True)
+# Path(states_path).mkdir(parents=True, exist_ok=True)
 
 # for i in range(len(episode)):
 # 	if i % 1 == 0:
