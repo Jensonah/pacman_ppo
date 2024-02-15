@@ -55,7 +55,7 @@ class Actor(nn.Module):
         probs = Categorical(probabilities)
         action = probs.sample()
         # TODO: log_prob or normal prob? PPO paper says normal prob...
-        return action.item(), probs.log_prob(action).exp() #probabilities[0, action]
+        return action.item(), probabilities[0, action] #probs.log_prob(action).exp() #
     
 
 class Critic(nn.Module):
@@ -336,3 +336,5 @@ for data, img_name, title, y_label in plots:
 
 torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
 torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
+
+env.close()

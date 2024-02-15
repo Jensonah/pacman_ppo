@@ -156,6 +156,14 @@ def state_to_normalized_tensor(state, device, dim):
 	return torch.from_numpy(transposed_array).float().to(device)
 
 
+def get_additional_reward_from_info(last_info, info):
+	# if we lost a life we give a penalty
+	if last_info['lives'] > info['lives']:
+		return -100
+	else:
+		return 0
+
+
 def collect_episode(env, model):
 
 	episode = []
@@ -172,7 +180,7 @@ def collect_episode(env, model):
 
 	new_state, info = env.reset()
 
-	last_life_value = info['lives']
+	last_info = info
 	
 	while not (terminated or truncated):
 
@@ -184,13 +192,9 @@ def collect_episode(env, model):
 
 		new_state, reward, terminated, truncated, info = env.step(action)
 
+		reward_correction = get_additional_reward_from_info(last_info, info)
 
-		if last_life_value > info['lives']:
-			last_life_value = info['lives']
-			# in a previous implementation I always summed the number of current lives to the reward
-			# this resulted in pacman hiding in a corner, as staying alive longer -> more rewards
-			# now we just give a penalty when he dies
-			reward -= 25
+		reward += reward_correction
 
 		# For memory reasons we only save the frame within the state
 		# These can be recovered later, using the functions provided
