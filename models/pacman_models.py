@@ -5,6 +5,7 @@ from torch.distributions import Categorical
 
 class Base_model(nn.Module):
 	raise NotImplementedError()
+	x = F.log_softmax(x, dim=1)
 
 
 class Actor(nn.Module):

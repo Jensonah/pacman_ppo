@@ -67,17 +67,17 @@ class Actor(__Base_model__):
 
 
     def final_activation(self, x):
-        return F.softmax(x, dim=1)
+        return F.log_softmax(x, dim=1)
     
 
     def act(self, state):
 
         probabilities = self.forward(state)
 
-        probs = Categorical(probabilities)
+        probs = Categorical(logits=probabilities)
         action = probs.sample()
-        # TODO: log_prob or normal prob? PPO paper says normal prob...
-        return action.item(), probabilities[0, action] #probs.log_prob(action).exp() #
+        # TODO: log_prob or normal prob? PPO paper says normal prob... Mistake coming up?
+        return action.item(), probabilities[0, action]
     
 
 class Critic(__Base_model__):

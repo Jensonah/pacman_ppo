@@ -97,7 +97,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                     else:
                         actor_probs = get_probs(actor, states[j], actions[j])
 
-                    difference_grad = torch.div(actor_probs, original_probs[j]).unsqueeze(1)
+                    difference_grad = torch.exp(actor_probs - original_probs[j]).unsqueeze(1)
                     # Note that for k = 0 these are all ones, but we keep the calculation such that the
                     # backtracking algorithm can also see this
                     

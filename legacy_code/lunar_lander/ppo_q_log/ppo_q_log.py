@@ -44,6 +44,7 @@ class Actor(nn.Module):
 
         x = self.fc6(x)
         x = F.log_softmax(x, dim=1)
+        #x = F.softmax(x, dim=1)
 
         return x
     
@@ -53,8 +54,9 @@ class Actor(nn.Module):
         probabilities = self.forward(state)
 
         probs = Categorical(logits=probabilities)
+        #probs = Categorical(probs=probabilities)
         action = probs.sample()
-        # TODO: log_prob or normal prob? PPO paper says normal prob...
+        # TODO: log_prob or normal prob? PPO paper says normal prob... Mistake coming up?
         return action.item(), probabilities[0, action]
     
 
@@ -131,9 +133,9 @@ def collect_episode(env, model):
 
 # index probability of action taken at sampling time with current updated model
 def get_probs(actor, states, actions):
-    all_log_probs = torch.cat([actor.forward(state) for state in states])
+    all_probs = torch.cat([actor.forward(state) for state in states])
     actions = torch.Tensor(actions).int()
-    out = all_log_probs[torch.arange(all_log_probs.size(0)), actions]
+    out = all_probs[torch.arange(all_probs.size(0)), actions]
     # the line above does the line below more efficiently
     #[all_probs[i][actions[i]].unsqueeze(0) for i in range(len(actions))]
     return out
@@ -144,6 +146,11 @@ def get_standardized_tensor(xs):
     # added to the standard deviation of the returns to avoid numerical instabilities   
     eps = np.finfo(np.float32).eps.item()
     return (xs - xs.mean()) / (xs.std() + eps)
+
+
+def pack_data(data):
+    data = np.array(data)
+    return (data.mean(), data.min(), data.max())
 
 
 def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, gamma):
@@ -158,7 +165,9 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
         ppo_losses = []
         critic_losses = []
 
-        for i in tqdm(range(num_episodes)):
+        pbar = tqdm(range(num_episodes))
+
+        for i in pbar:
 
             episodes = [collect_episode(env, actor) for _ in range(num_actors)]
 
@@ -166,7 +175,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
             actions = [[action for _, action, _, _ in episode] for episode in episodes]
             original_probs  = [torch.cat([prob for _, _, prob, _ in episode]) for episode in episodes]
             rewards = [torch.tensor([reward for _, _, _, reward in episode]).unsqueeze(1) for episode in episodes]
-            rewards_std = [get_standardized_tensor(reward) for reward in rewards]
+            rewards_std = [get_standardized_tensor(reward).float() for reward in rewards]
 
             losses_k = []
             ppo_losses_k = []
@@ -207,7 +216,9 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                     else:
                         actor_probs = get_probs(actor, states[j], actions[j])
 
-                    difference_grad = torch.div(actor_probs, original_probs[j]).unsqueeze(1)
+                    difference_grad = torch.exp(actor_probs - original_probs[j]).unsqueeze(1)
+                    #difference_grad = torch.div(actor_probs, original_probs[j]).unsqueeze(1)
+                    #print(difference_grad.shape)
                     # Note that for k = 0 these are all ones, but we keep the calculation such that the
                     # backtracking algorithm can also see this
                     
@@ -227,16 +238,13 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                 losses_k.append(loss.detach()/num_actors)
                 ppo_losses_k.append(ppo_loss.detach()/num_actors)
                 critic_losses_k.append(critic_loss.detach()/num_actors)
-
-
-            def pack_data(data):
-                data = np.array(data)
-                return (data.mean(), data.min(), data.max())
             
             losses.append(pack_data(losses_k))
             ppo_losses.append(pack_data(ppo_losses_k))
             critic_losses.append(pack_data(critic_losses_k))
             obj_func_hist.append(pack_data([sum(episode) for episode in rewards]))
+
+            pbar.set_description(f"Avg. Reward {obj_func_hist[i][0]:.1f}")
 
         return obj_func_hist, losses, ppo_losses, critic_losses
     
@@ -277,12 +285,12 @@ def plot_fancy_loss(data, path, title, y_label):
 lunar_lander_hyperparameters = {
     "num_episodes" : 1000,
     "gamma" : 0.99,
-    "lr" : 5e-5,
+    "lr" : 1e-4,
     "env_name" : "LunarLander-v2",
     "render_mode" : "rgb_array",
-    "trial_number" : 1,
+    "trial_number" : 0,
     "eps" : 0.2,
-    "num_epochs" : 10,
+    "num_epochs" : 5,
     "num_actors" : 5,
     "device" : "cpu"
 }
@@ -332,3 +340,5 @@ for data, img_name, title, y_label in plots:
 
 torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
 torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
+
+env.close()
