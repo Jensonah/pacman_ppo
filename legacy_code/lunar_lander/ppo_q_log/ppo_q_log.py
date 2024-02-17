@@ -283,15 +283,15 @@ def plot_fancy_loss(data, path, title, y_label):
 
 
 lunar_lander_hyperparameters = {
-    "num_episodes" : 1000,
+    "num_episodes" : 250,
     "gamma" : 0.99,
     "lr" : 1e-4,
     "env_name" : "LunarLander-v2",
     "render_mode" : "rgb_array",
-    "trial_number" : 0,
+    "trial_number" : 3,
     "eps" : 0.2,
     "num_epochs" : 5,
-    "num_actors" : 5,
+    "num_actors" : 20,
     "device" : "cpu"
 }
 

@@ -1,13 +1,17 @@
 import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 
 
-def plot_fancy_loss(data, path, title, y_label):
+def plot_fancy_loss(df, path, title, y_label):
 
-    means, mins, maxes = list(map(list, zip(*data)))
-
+    means = np.squeeze(df[['means']].values)
+    mins = np.squeeze(df[['mins']].values)
+    maxes = np.squeeze(df[['maxes']].values)
+    
     plt.clf()
 
-    xs = range(len(data))
+    xs = range(len(means))
 
     # Plot means
     plt.plot(xs, means,     color='blue', linestyle='solid', alpha=0.8)
@@ -29,3 +33,12 @@ def plot_fancy_loss(data, path, title, y_label):
     #plt.legend(['My PPO implementation'])
     plt.savefig(path)
     
+
+def dump_to_pickle(data, path):
+    df = pd.DataFrame(data, columns=['means', 'mins', 'maxes'])
+    df.to_pickle(path)
+
+
+def load_pickle(path):
+    df = pd.read_pickle(path)
+    return df

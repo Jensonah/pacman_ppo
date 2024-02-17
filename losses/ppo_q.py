@@ -1,10 +1,21 @@
 import torch
-from losses.base import __loss_calculator__
 
-class PPO_Q_loss_calculator(__loss_calculator__):
+class PPO_Q_loss_calculator():
 
 	def __init__(self, gamma) -> None:
-		super(PPO_Q_loss_calculator, self).__init__(gamma)
+		
+		self.gamma = gamma
+
+		self.critic_values_best_t = None
+		self.critic_values_action_t = None
+
+		self.critic_values_best_t1 = None
+		self.critic_values_action_t1 = None
+
+		self.rewards = None
+
+		self.retrieved_critic_loss = False
+		self.retrieved_advantage = False
 
 	
 	def update_losses(self, critic_values, actions, rewards):
@@ -23,25 +34,26 @@ class PPO_Q_loss_calculator(__loss_calculator__):
 		self.retrieved_critic_loss = False
 		self.retrieved_advantage = False
 
+	
+	def safety_check(self, already_retrieved):
+
+		if already_retrieved:
+			raise RuntimeError("""Losses should be updated using update_losses() before retrieval.
+						Make sure to not call this function twice in a row.""")
+		
+		return True
+
 
 	def get_critic_loss(self):
 
-		if self.retrieved_critic_loss:
-			raise RuntimeError("""Losses should first be updated using update_losses() before retrieval.
-						Make sure to not call this function twice in a row.""")
-		
-		self.retrieved_critic_loss = True
+		self.retrieved_critic_loss = self.safety_check(self.retrieved_critic_loss)
 		
 		return torch.mean( (self.gamma*self.critic_values_best_t1 - (self.critic_values_action_t - self.rewards))**2 )
 
 
 	def get_advantage(self):
-
-		if self.retrieved_advantage:
-			raise RuntimeError("""Losses should first be updated using update_losses() before retrieval.
-						Make sure to not call this function twice in a row.""")
 		
-		self.retrieved_advantage = True
+		self.retrieved_advantage = self.safety_check(self.retrieved_advantage)
 
 		# Here we are comparing two state value estimation, one made one timestep later than the other
         # Their difference is zero if in that timestep we took the optimal action

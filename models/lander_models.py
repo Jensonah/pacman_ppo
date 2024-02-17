@@ -22,7 +22,7 @@ class __Base_model__(nn.Module):
 
 
     def final_activation(self, x):
-        raise NotImplementedError()
+        raise NotImplementedError("Final activation not implemented in base class")
     
 
     def normalize_state(self, state):
@@ -76,7 +76,6 @@ class Actor(__Base_model__):
 
         probs = Categorical(logits=probabilities)
         action = probs.sample()
-        # TODO: log_prob or normal prob? PPO paper says normal prob... Mistake coming up?
         return action.item(), probabilities[0, action]
     
 

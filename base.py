@@ -82,8 +82,6 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
                 for j in range(num_actors):
 
-                    len_episode = len(episodes[j])
-
                     # TODO: see if we can batch the forwards here
                     critic_values  = torch.cat([critic(state) for state in states[j]])
                     
