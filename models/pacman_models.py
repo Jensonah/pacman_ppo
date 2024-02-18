@@ -1,11 +1,14 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+import numpy as np
+import cv2
 
 
 class Base_model(nn.Module):
 
-    def __init__(self, device, input_frame_dim, no_frames):
+    def __init__(self, device, mode, input_frame_dim, no_frames, scale):
         super(Base_model, self).__init__()
 
         # In this implementation the previous frames and the different rgb channels are in the same dimension
@@ -13,34 +16,47 @@ class Base_model(nn.Module):
         # different kernels for each frame
 
         self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (5,5), groups=1, stride=(2,2))
+        nn.init.kaiming_uniform_(self.conv1.weight, gain=nn.init.calculate_gain('relu'))
+        self.conv1.bias.data.fill_(0.01)
         
         self.conv2 = nn.Conv2d(3*no_frames, 2*no_frames, (5,5), groups=1, stride=(1,1))
+        nn.init.kaiming_uniform_(self.conv2.weight, gain=nn.init.calculate_gain('relu'))
+        self.conv2.bias.data.fill_(0.01)
         
         self.conv3 = nn.Conv2d(2*no_frames, no_frames, (5,5), groups=1, stride=(1,1))
+        nn.init.kaiming_uniform_(self.conv3.weight, gain=nn.init.calculate_gain('relu'))
+        self.conv3.bias.data.fill_(0.01)
         
         self.conv4 = nn.Conv2d(no_frames, no_frames, (5,5), groups=1, stride=(1,1))
+        nn.init.kaiming_uniform_(self.conv4.weight, gain=nn.init.calculate_gain('relu'))
+        self.conv4.bias.data.fill_(0.01)
         
         self.conv5 = nn.Conv2d(no_frames, 1, (5,5), groups=1, stride=(1,1))
+        nn.init.kaiming_uniform_(self.conv5.weight, gain=nn.init.calculate_gain('relu'))
+        self.conv5.bias.data.fill_(0.01)
         
         self.flat = nn.Flatten()
         
         self.full1 = nn.Linear(35*22, 500)
+        nn.init.kaiming_uniform_(self.full1.weight, gain=nn.init.calculate_gain('relu'))
+        self.full1.bias.data.fill_(0.01)
 
         self.full2 = nn.Linear(500, 100)
+        nn.init.kaiming_uniform_(self.full2.weight, gain=nn.init.calculate_gain('relu'))
+        self.full2.bias.data.fill_(0.01)
         
         self.full3 = nn.Linear(100, 5)
+        nn.init.xavier_uniform_(self.full3.weight)
+        self.full3.bias.data.fill_(0.01)
 
         self.device = device
-        self.input_frame_dim = input_frame_dim
+
+        self.input_frame_dim = (input_frame_dim[0], input_frame_dim[1]//scale, input_frame_dim[2]//scale)
         self.no_frames = no_frames
 
     
     def final_activation(self, x):
         raise NotImplementedError("Final activation not implemented in base class")
-    
-
-    def normalize_state(self, state):
-        raise NotImplementedError("Normalize state not yet implemented")
         
 
     def forward(self, x):
@@ -76,12 +92,12 @@ class Base_model(nn.Module):
 
 class Actor(Base_model):
 
-    def __init__(self, device, input_frame_dim, no_frames):
-        super(Actor, self).__init__(device, input_frame_dim, no_frames)
+    def __init__(self, device, mode, input_frame_dim = (3,210,160), no_frames = 2, scale = 2):
+        super(Actor, self).__init__(device, mode, input_frame_dim, no_frames, scale)
 
 
     def final_activation(self, x):
-        return F.log_softmax(x)	
+        return F.log_softmax(x, dim=1)	
 
 
     def act(self, state_3):
@@ -96,10 +112,91 @@ class Actor(Base_model):
         return action.item(), probabilities[0, action]
     
 
+    def state_to_normalized_tensor(self, frame):
+
+        dim = self.input_frame_dim
+
+        frame = cv2.resize(frame, (dim[2], dim[1]), interpolation=cv2.INTER_AREA)
+
+        frame = np.array(frame) / 255
+
+        # PyTorch wants the rgb channel first
+        transposed_frame = np.transpose(frame, (2, 0, 1))
+
+        return torch.from_numpy(transposed_frame).float().to(self.device)
+
+
+    def states_generator(self, frames):
+
+        dim = self.input_frame_dim
+        zeros_dim = (dim[0]*(self.no_frames-1), dim[1], dim[2])
+
+        zeros = torch.from_numpy(np.zeros(zeros_dim))
+        
+        state_repr = zeros.float().to(self.device)
+
+        for frame in frames:
+            state_repr = torch.cat((state_repr, frame))
+            model_ready_state = state_repr.unsqueeze(0)
+
+            yield model_ready_state
+
+            state_repr = state_repr[3:]
+
+
+    def collect_episode(self, env):
+        
+        terminated = False
+        truncated = False
+
+        frames, actions, probs_list, rewards = [], [], [], []
+
+        # (rgb, x, y) -> ((no_frames-1)*rgb, x, y)
+        dim = self.input_frame_dim
+        zeros_dim = (dim[0]*(self.no_frames-1), dim[1], dim[2])
+
+        zeros = torch.from_numpy(np.zeros(zeros_dim))
+        
+        state_repr = zeros.float().to(self.device)
+
+        new_state, info = env.reset()
+
+        last_info = info
+        
+        while not (terminated or truncated):
+
+            frame = self.state_to_normalized_tensor(new_state)
+            state_repr = torch.cat((state_repr, frame))
+            model_ready_state = state_repr.unsqueeze(0)
+
+            action, probs = self.act(model_ready_state)
+
+            new_state, reward, terminated, truncated, info = env.step(action)
+
+            if last_info['lives'] > info['lives']:
+                reward -= 100
+
+            last_info = info
+
+            # For memory reasons we only save the frame within the state
+            # These can be recovered later, using the functions provided
+            frames.append(frame), actions.append(action), probs_list.append(probs), rewards.append(reward)
+
+            # 3 because we work with rgb, could also polished by integrating into hyperpars
+            # we pop the last frame here
+            state_repr = state_repr[3:]
+
+        # Probably unnecessary
+        # if truncated:
+        #     rewards[-1] -= 50
+
+        return (frames, self.states_generator, actions, probs_list, rewards)
+    
+
 class Critic(Base_model):
 
-    def __init__(self, device, input_frame_dim, no_frames):
-        super(Critic, self).__init__(device, input_frame_dim, no_frames)
+    def __init__(self, device, mode, input_frame_dim = (3, 210,160), no_frames = 2, scale = 2):
+        super(Critic, self).__init__(device, mode, input_frame_dim, no_frames, scale)
 
     
     def final_activation(self, x):

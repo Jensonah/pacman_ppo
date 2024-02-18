@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
@@ -12,29 +13,34 @@ class __Base_model__(nn.Module):
                      'state_action' : 4}
 
         self.fc1 = nn.Linear(8, 256)
+        nn.init.kaiming_uniform_(self.fc1.weight, gain=nn.init.calculate_gain('relu'))
+        self.fc1.bias.data.fill_(0.01)
+
         self.fc2 = nn.Linear(256, 512)
+        nn.init.kaiming_uniform_(self.fc2.weight, gain=nn.init.calculate_gain('relu'))
+        self.fc2.bias.data.fill_(0.01)
+
         self.fc3 = nn.Linear(512, 256)
+        nn.init.kaiming_uniform_(self.fc3.weight, gain=nn.init.calculate_gain('relu'))
+        self.fc3.bias.data.fill_(0.01)
+
         self.fc4 = nn.Linear(256, 128)
+        nn.init.kaiming_uniform_(self.fc4.weight, gain=nn.init.calculate_gain('relu'))
+        self.fc4.bias.data.fill_(0.01)
+
         self.fc5 = nn.Linear(128, 128)
+        nn.init.kaiming_uniform_(self.fc5.weight, gain=nn.init.calculate_gain('relu'))
+        self.fc5.bias.data.fill_(0.01)
+
         self.fc6 = nn.Linear(128, mode_dict[mode])
+        nn.init.xavier_uniform_(self.fc6.weight)
+        self.fc6.bias.data.fill_(0.01)
 
         self.device = device
 
 
     def final_activation(self, x):
         raise NotImplementedError("Final activation not implemented in base class")
-    
-
-    def normalize_state(self, state):
-        state[0] /= 1.5
-        state[1] /= 1.5
-        state[2] /= 5.0
-        state[3] /= 5.0
-        state[4] /= 3.1415927
-        state[5] /= 5.0	
-        # idx 6 and 7 are bools
-        
-        return state
         
 
     def forward(self, x):
@@ -77,6 +83,50 @@ class Actor(__Base_model__):
         probs = Categorical(logits=probabilities)
         action = probs.sample()
         return action.item(), probabilities[0, action]
+    
+
+    def normalize_state(self, state):
+        state[0] /= 1.5
+        state[1] /= 1.5
+        state[2] /= 5.0
+        state[3] /= 5.0
+        state[4] /= 3.1415927
+        state[5] /= 5.0	
+        # idx 6 and 7 are bools
+        
+        return state
+    
+    def states_generator(self, states):
+
+        for state in states:
+            yield state
+    
+
+    def collect_episode(self, env):
+
+        terminated = False
+        truncated = False
+
+        new_state, info = env.reset()
+
+        states, actions, probs_list, rewards = [], [], [], []
+
+        while not (terminated or truncated):
+
+            state = self.normalize_state(new_state)
+            state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
+            
+            action, probs = self.act(state)
+
+            new_state, reward, terminated, truncated, info = env.step(action)
+
+            states.append(state), actions.append(action), probs_list.append(probs), rewards.append(reward)
+
+        # Probably unnecessary
+        # if truncated:
+        #     rewards[-1] -= 50
+
+        return (states, self.states_generator, actions, probs_list, rewards)
     
 
 class Critic(__Base_model__):

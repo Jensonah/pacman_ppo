@@ -6,7 +6,7 @@ import json
 from base import train
 from models.model_factory import ModelFactory
 from losses.loss_factory import LossFactory
-from utils import plot_fancy_loss, dump_to_pickle
+from utils import dump_to_pickle
 
 
 hyperparameters = json.load(open("config.json"))
@@ -18,8 +18,7 @@ actor, critic = ModelFactory.create_model(env_name, hyperparameters["device"], h
 loss_calculator = LossFactory.create_loss_calculator(hyperparameters["loss"], hyperparameters["gamma"])
 
 env = gym.make(hyperparameters["env_name"], 
-               render_mode=hyperparameters["render_mode"],
-               continuous=False)
+               render_mode=hyperparameters["render_mode"])
 
 base_path = f"trials/{env_name}/{hyperparameters['loss']}/trial_data/trial_{hyperparameters['trial_number']}"
 
@@ -37,7 +36,6 @@ obj_func_hist, losses, ppo_loss, critic_loss = train(env,
                               num_actors,
                               hyperparameters["num_epochs"],
                               hyperparameters["eps"],
-                              hyperparameters["gamma"],
 							  loss_calculator)
 
 json.dump(hyperparameters, open(f"{base_path}/hyperparameters.json",'w'))

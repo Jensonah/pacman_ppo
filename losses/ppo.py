@@ -6,8 +6,8 @@ class PPO_loss_calculator():
 
 		self.gamma = gamma
 
-		self.critic_values_action_t = None
-		self.critic_values_action_t1 = None
+		self.critic_values_t = None
+		self.critic_values_t1 = None
 
 		self.rewards = None
 
@@ -17,7 +17,7 @@ class PPO_loss_calculator():
 	
 	def update_losses(self, critic_values, _, rewards):
 		
-		self.critic_values = critic_values
+		self.critic_values_t = critic_values
 		self.critic_values_t1 = torch.cat((critic_values.clone()[1:], torch.zeros(1,1)))
 
 		self.rewards = rewards
@@ -39,7 +39,7 @@ class PPO_loss_calculator():
 
 		self.retrieved_critic_loss = self.safety_check(self.retrieved_critic_loss)
 		
-		return torch.mean( (self.gamma*self.critic_values_t1 - (self.critic_values_action_t - self.rewards))**2 )
+		return torch.mean( (self.gamma*self.critic_values_t1 - (self.critic_values_t - self.rewards))**2 )
 
 
 	def get_advantage(self):
@@ -48,4 +48,4 @@ class PPO_loss_calculator():
 
 		# Here we are comparing two state value estimation, one made one timestep later than the other
         # Their difference is zero if in that timestep we took the optimal action
-		return self.gamma*self.critic_values_action_t1 - (self.critic_values_action_t - self.rewards)
+		return self.gamma*self.critic_values_t1 - (self.critic_values_t - self.rewards)

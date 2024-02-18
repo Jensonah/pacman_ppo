@@ -24,29 +24,7 @@ def get_probs(actor, states, actions):
     return out
 
 
-def collect_episode(env, model):
-
-    episode = []
-    terminated = False
-    truncated = False
-
-    new_state, info = env.reset()
-
-    while not (terminated or truncated):
-
-        state = model.normalize_state(new_state)
-        state = torch.from_numpy(state).float().unsqueeze(0).to(model.device)
-        
-        action, probs = model.act(state)
-
-        new_state, reward, terminated, truncated, info = env.step(action)
-
-        episode.append((state, action, probs, reward))
-
-    return episode
-
-
-def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, gamma, loss_calculator):
+def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, loss_calculator):
 
     # We wrap our training in an try-except block such that we can do a Keyboard interrupt
     # without losing our progress
@@ -62,13 +40,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
         for i in pbar:
 
-            episodes = [collect_episode(env, actor) for _ in range(num_actors)]
-
-            states = [[state for state, _, _, _ in episode] for episode in episodes]
-            actions = [[action for _, action, _, _ in episode] for episode in episodes]
-            original_probs  = [torch.cat([prob for _, _, prob, _ in episode]) for episode in episodes]
-            rewards = [torch.tensor([reward for _, _, _, reward in episode]).unsqueeze(1) for episode in episodes]
-            rewards_std = [get_standardized_tensor(reward).float() for reward in rewards]
+            episodes = [actor.collect_episode(env) for _ in range(num_actors)]
 
             losses_k = []
             ppo_losses_k = []
@@ -82,20 +54,27 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
                 for j in range(num_actors):
 
+                    compressed_states, states_generator, actions, original_probs, rewards = episodes[j]
+
+                    original_probs = torch.tensor(original_probs).to(actor.device)
+                    rewards = torch.tensor(rewards).to(actor.device) 
+
+                    rewards_std = get_standardized_tensor(rewards)
+
                     # TODO: see if we can batch the forwards here
-                    critic_values  = torch.cat([critic(state) for state in states[j]])
+                    critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
                     
-                    loss_calculator.update_losses(critic_values, actions[j], rewards_std[j])
+                    loss_calculator.update_losses(critic_values, actions, rewards_std)
                     critic_loss += loss_calculator.get_critic_loss()
                     advantage = loss_calculator.get_advantage()
 
                     if k == 0:
-                        actor_probs = original_probs[j].clone()
-                        original_probs[j] = original_probs[j].detach()
+                        actor_probs = original_probs.clone()
+                        original_probs = original_probs.detach()
                     else:
-                        actor_probs = get_probs(actor, states[j], actions[j])
+                        actor_probs = get_probs(actor, states_generator(compressed_states), actions)
 
-                    difference_grad = torch.exp(actor_probs - original_probs[j]).unsqueeze(1)
+                    difference_grad = torch.exp(actor_probs - original_probs).unsqueeze(1)
                     # Note that for k = 0 these are all ones, but we keep the calculation such that the
                     # backtracking algorithm can also see this
                     
@@ -119,7 +98,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
             losses.append(pack_data(losses_k))
             ppo_losses.append(pack_data(ppo_losses_k))
             critic_losses.append(pack_data(critic_losses_k))
-            obj_func_hist.append(pack_data([sum(episode) for episode in rewards]))
+            obj_func_hist.append(pack_data([sum(rewards) for _, _, _, _, rewards in episodes]))
 
             pbar.set_description(f"Avg. Reward {obj_func_hist[i][0]:.1f}")
 

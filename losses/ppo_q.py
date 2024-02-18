@@ -20,7 +20,7 @@ class PPO_Q_loss_calculator():
 	
 	def update_losses(self, critic_values, actions, rewards):
 
-		len_episode = len(rewards)
+		len_episode = len(actions)
 		
 		self.critic_values_best_t = torch.max(critic_values, 1).values.unsqueeze(1)
 		self.critic_values_best_t1 = torch.cat((self.critic_values_best_t.clone()[1:], torch.zeros(1,1)))
