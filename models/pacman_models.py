@@ -16,33 +16,33 @@ class Base_model(nn.Module):
         # different kernels for each frame
 
         self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (5,5), groups=1, stride=(2,2))
-        nn.init.kaiming_uniform_(self.conv1.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.conv1.weight)
         self.conv1.bias.data.fill_(0.01)
         
         self.conv2 = nn.Conv2d(3*no_frames, 2*no_frames, (5,5), groups=1, stride=(1,1))
-        nn.init.kaiming_uniform_(self.conv2.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.conv2.weight)
         self.conv2.bias.data.fill_(0.01)
         
         self.conv3 = nn.Conv2d(2*no_frames, no_frames, (5,5), groups=1, stride=(1,1))
-        nn.init.kaiming_uniform_(self.conv3.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.conv3.weight)
         self.conv3.bias.data.fill_(0.01)
         
         self.conv4 = nn.Conv2d(no_frames, no_frames, (5,5), groups=1, stride=(1,1))
-        nn.init.kaiming_uniform_(self.conv4.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.conv4.weight)
         self.conv4.bias.data.fill_(0.01)
         
         self.conv5 = nn.Conv2d(no_frames, 1, (5,5), groups=1, stride=(1,1))
-        nn.init.kaiming_uniform_(self.conv5.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.conv5.weight)
         self.conv5.bias.data.fill_(0.01)
         
         self.flat = nn.Flatten()
         
         self.full1 = nn.Linear(35*22, 500)
-        nn.init.kaiming_uniform_(self.full1.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.full1.weight)
         self.full1.bias.data.fill_(0.01)
 
         self.full2 = nn.Linear(500, 100)
-        nn.init.kaiming_uniform_(self.full2.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.full2.weight)
         self.full2.bias.data.fill_(0.01)
         
         self.full3 = nn.Linear(100, 5)

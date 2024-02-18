@@ -13,6 +13,8 @@ def plot_fancy_loss(df, path, title, y_label):
 
     xs = range(len(means))
 
+    plt.figure(figsize=(10,5))
+
     # Plot means
     plt.plot(xs, means,     color='blue', linestyle='solid', alpha=0.8)
 
@@ -31,6 +33,7 @@ def plot_fancy_loss(df, path, title, y_label):
     plt.xlabel('Episode No.')
     plt.ylabel(y_label)
     #plt.legend(['My PPO implementation'])
+
     plt.savefig(path)
     
 

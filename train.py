@@ -42,6 +42,7 @@ json.dump(hyperparameters, open(f"{base_path}/hyperparameters.json",'w'))
 
 # check if directory exist, if not, make it
 Path(f"{base_path}/save/").mkdir(parents=True, exist_ok=True)
+Path(f"{base_path}/pickles/").mkdir(parents=True, exist_ok=True)
 
 plots = [(obj_func_hist, "/rewards", "Reward Projection", "Reward"),
          (losses, "/total_loss", "Total loss Projection", "Total loss"),
@@ -49,7 +50,7 @@ plots = [(obj_func_hist, "/rewards", "Reward Projection", "Reward"),
          (ppo_loss, "/ppo_loss", "PPO loss Projection", "PPO loss")]
 
 for data, name, title, y_label in plots:
-    dump_to_pickle(data, f"{base_path}{name}.pkl")   
+    dump_to_pickle(data, f"{base_path}/pickles/{name}.pkl")   
     
 
 torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")

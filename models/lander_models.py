@@ -13,23 +13,23 @@ class __Base_model__(nn.Module):
                      'state_action' : 4}
 
         self.fc1 = nn.Linear(8, 256)
-        nn.init.kaiming_uniform_(self.fc1.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.fc1.weight)
         self.fc1.bias.data.fill_(0.01)
 
         self.fc2 = nn.Linear(256, 512)
-        nn.init.kaiming_uniform_(self.fc2.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.fc2.weight)
         self.fc2.bias.data.fill_(0.01)
 
         self.fc3 = nn.Linear(512, 256)
-        nn.init.kaiming_uniform_(self.fc3.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.fc3.weight)
         self.fc3.bias.data.fill_(0.01)
 
         self.fc4 = nn.Linear(256, 128)
-        nn.init.kaiming_uniform_(self.fc4.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.fc4.weight)
         self.fc4.bias.data.fill_(0.01)
 
         self.fc5 = nn.Linear(128, 128)
-        nn.init.kaiming_uniform_(self.fc5.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.kaiming_uniform_(self.fc5.weight)
         self.fc5.bias.data.fill_(0.01)
 
         self.fc6 = nn.Linear(128, mode_dict[mode])
