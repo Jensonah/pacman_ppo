@@ -203,8 +203,8 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                     critic_values_action_t = critic_values_t[torch.arange(len_episode), actions[j]].unsqueeze(1)
                     critic_values_action_t1 = torch.cat((critic_values_action_t.clone()[1:], torch.zeros(1,1)))
                     
-                    #critic_loss += torch.mean( (gamma*critic_values_best_t1 - (critic_values_action_t - rewards_std[j]))**2 )
-                    critic_loss += torch.mean( (gamma*critic_values_action_t1 - (critic_values_action_t - rewards_std[j]))**2 )
+                    critic_loss += torch.mean( (gamma*critic_values_best_t1 - (critic_values_action_t - rewards_std[j]))**2 )
+                    #critic_loss += torch.mean( (gamma*critic_values_action_t1 - (critic_values_action_t - rewards_std[j]))**2 )
 
                     # Here we are comparing two state value estimation, one made one timestep later than the other
                     # Their difference is zero if in that timestep we took the optimal action

@@ -20,4 +20,4 @@ for name, title, y_label in plots:
 	df = load_pickle(f"{base_path}/pickles/{name}{'.pkl'}")
 	plot_fancy_loss(df, f"{base_path}/plots/{name}.png", title, y_label)
 
-print("Graphs saved successfully!")
+print("Plots saved successfully!")

@@ -40,7 +40,17 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
         for i in pbar:
 
-            episodes = [actor.collect_episode(env) for _ in range(num_actors)]
+            non_processed_episodes = [actor.collect_episode(env) for _ in range(num_actors)]
+
+            episodes = []
+
+            for _a, _b, _c, original_probs, rewards in non_processed_episodes:
+                original_probs = torch.cat(original_probs)
+
+                rewards = torch.tensor(rewards).to(actor.device).unsqueeze(1)
+                rewards_std = get_standardized_tensor(rewards)
+
+                episodes.append((_a,_b,_c,original_probs, rewards_std))
 
             losses_k = []
             ppo_losses_k = []
@@ -56,23 +66,19 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
                     compressed_states, states_generator, actions, original_probs, rewards = episodes[j]
 
-                    original_probs = torch.tensor(original_probs).to(actor.device)
-                    rewards = torch.tensor(rewards).to(actor.device) 
-
-                    rewards_std = get_standardized_tensor(rewards)
-
                     # TODO: see if we can batch the forwards here
                     critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
                     
-                    loss_calculator.update_losses(critic_values, actions, rewards_std)
+                    loss_calculator.update_losses(critic_values, actions, rewards)
                     critic_loss += loss_calculator.get_critic_loss()
                     advantage = loss_calculator.get_advantage()
 
                     if k == 0:
                         actor_probs = original_probs.clone()
-                        original_probs = original_probs.detach()
                     else:
                         actor_probs = get_probs(actor, states_generator(compressed_states), actions)
+
+                    original_probs = original_probs.detach()
 
                     difference_grad = torch.exp(actor_probs - original_probs).unsqueeze(1)
                     # Note that for k = 0 these are all ones, but we keep the calculation such that the
@@ -98,7 +104,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
             losses.append(pack_data(losses_k))
             ppo_losses.append(pack_data(ppo_losses_k))
             critic_losses.append(pack_data(critic_losses_k))
-            obj_func_hist.append(pack_data([sum(rewards) for _, _, _, _, rewards in episodes]))
+            obj_func_hist.append(pack_data([sum(rewards) for _, _, _, _, rewards in non_processed_episodes]))
 
             pbar.set_description(f"Avg. Reward {obj_func_hist[i][0]:.1f}")
 
