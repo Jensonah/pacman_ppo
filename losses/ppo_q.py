@@ -34,16 +34,6 @@ class PPO_Q_loss_calculator():
 		self.retrieved_critic_loss = False
 		self.retrieved_advantage = False
 
-		# print(critic_values.shape)
-		# #print(actions.shape)
-		# print(len(actions))
-		# print(rewards.shape)
-		# print(self.critic_values_best_t.shape)
-		# print(self.critic_values_best_t1.shape)
-		# print(self.critic_values_action_t.shape)
-		# print(self.critic_values_action_t1.shape)
-		# print(":(")
-
 	
 	def safety_check(self, already_retrieved):
 
