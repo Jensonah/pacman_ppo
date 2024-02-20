@@ -14,7 +14,7 @@ class EnvFactory():
 		else:
 			render_mode = "rgb_array"
 			out_path = f"{base_path}/video_on_policy/"
-			video_trigger = 1e10
+			video_trigger = 1
 
 		if env_name == "LunarLander-v2":
 			env = gym.make(env_name, 
@@ -33,7 +33,7 @@ class EnvFactory():
 		
 		num_actors = hyperparameters["num_actors"]
 		
-		env = gym.wrappers.RecordVideo(env, out_path, episode_trigger=lambda t: t % (num_actors*video_trigger) == 0)
+		#env = gym.wrappers.RecordVideo(env, out_path, episode_trigger=lambda t: t % (num_actors*video_trigger) == 0)
 
 		return env
 
