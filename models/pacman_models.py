@@ -48,7 +48,7 @@ class Base_model(nn.Module):
         nn.init.kaiming_uniform_(self.full2.weight)
         self.full2.bias.data.fill_(0.01)
         
-        self.full3 = nn.Linear(100, 18) # TODO: 9 Should be right value
+        self.full3 = nn.Linear(100, 9)
         nn.init.xavier_uniform_(self.full3.weight)
         self.full3.bias.data.fill_(0.01)
 

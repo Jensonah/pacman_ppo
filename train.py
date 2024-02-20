@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-import EnvFactory
+from env_factory import EnvFactory
 from pathlib import Path
 import json
 from base import train
@@ -33,11 +33,11 @@ obj_func_hist, losses, ppo_loss, critic_loss = train(env,
                               hyperparameters["eps"],
 							  loss_calculator)
 
-json.dump(hyperparameters, open(f"{base_path}/hyperparameters.json",'w'))
-
 # check if directory exist, if not, make it
 Path(f"{base_path}/save/").mkdir(parents=True, exist_ok=True)
 Path(f"{base_path}/pickles/").mkdir(parents=True, exist_ok=True)
+
+json.dump(hyperparameters, open(f"{base_path}/hyperparameters.json",'w'))
 
 plots = [(obj_func_hist, "/rewards", "Reward Projection", "Reward"),
          (losses, "/total_loss", "Total loss Projection", "Total loss"),
