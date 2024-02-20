@@ -6,7 +6,7 @@ from pathlib import Path
 
 # TODO: customize plot function for pacman plots
 
-base_path = f"trials/ALE/MsPacman-v5/ppo_q/trial_data/trial_3"
+base_path = f"trials/LunarLander-v2/ppo/trial_data/trial_0"
 
 plots = [("rewards", "Reward Projection", "Reward"),
          ("total_loss", "Total loss Projection", "Total loss"),

@@ -40,7 +40,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
 
         for i in pbar:
 
-            non_processed_episodes = [actor.collect_episode(env) for _ in range(num_actors)]
+            non_processed_episodes = [actor.collect_episode(env, on_policy=False) for _ in range(num_actors)]
 
             episodes = []
 

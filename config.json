@@ -2,13 +2,13 @@
     "num_episodes" : 1000,
     "gamma" : 0.99,
     "lr" : 1e-4,
-    "env_name" : "ALE/MsPacman-v5",
+    "env_name" : "LunarLander-v2",
     "render_mode" : "rgb_array",
-    "trial_number" : "3",
+    "trial_number" : "0",
     "eps" : 0.2,
     "num_epochs" : 5,
-    "num_actors" : 3,
+    "num_actors" : 10,
     "device" : "cpu",
-	"loss" : "ppo_q",
-    "mode" : "state_action"
+	"loss" : "ppo",
+    "mode" : "state_only"
 }

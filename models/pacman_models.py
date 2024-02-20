@@ -11,6 +11,9 @@ class Base_model(nn.Module):
     def __init__(self, device, mode, input_frame_dim, no_frames, scale):
         super(Base_model, self).__init__()
 
+        if mode != 'state_action':
+            raise NotImplementedError("Only state_action mode is implemented")
+
         # In this implementation the previous frames and the different rgb channels are in the same dimension
         # Reasoning being that on all channels the same kernels will work, and their wouldn't be a need to learn
         # different kernels for each frame
@@ -45,7 +48,7 @@ class Base_model(nn.Module):
         nn.init.kaiming_uniform_(self.full2.weight)
         self.full2.bias.data.fill_(0.01)
         
-        self.full3 = nn.Linear(100, 5)
+        self.full3 = nn.Linear(100, 18) # TODO: 9 Should be right value
         nn.init.xavier_uniform_(self.full3.weight)
         self.full3.bias.data.fill_(0.01)
 
@@ -100,6 +103,8 @@ class Actor(Base_model):
         return F.log_softmax(x, dim=1)	
 
 
+    # TODO: these two functions could be placed in a common actor base class
+
     def act(self, state_3):
 
         # we bring the last three frames to the model
@@ -110,6 +115,12 @@ class Actor(Base_model):
         probs = Categorical(logits=probabilities)
         action = probs.sample()
         return action.item(), probabilities[0, action]
+    
+
+    def follow_policy(self, x):
+        probs = self.forward(x)
+        action = torch.argmax(probs).detach()
+        return int(action), probs[0, action]
     
 
     def state_to_normalized_tensor(self, frame):
@@ -144,7 +155,7 @@ class Actor(Base_model):
             state_repr = state_repr[3:]
 
 
-    def collect_episode(self, env):
+    def collect_episode(self, env, on_policy):
         
         terminated = False
         truncated = False
@@ -169,7 +180,10 @@ class Actor(Base_model):
             state_repr = torch.cat((state_repr, frame))
             model_ready_state = state_repr.unsqueeze(0)
 
-            action, probs = self.act(model_ready_state)
+            if on_policy:
+                action, probs = self.follow_policy(model_ready_state)
+            else:
+                action, probs = self.act(model_ready_state)
 
             new_state, reward, terminated, truncated, info = env.step(action)
 

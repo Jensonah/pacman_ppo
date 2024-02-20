@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-import gymnasium as gym
+import EnvFactory
 from pathlib import Path
 import json
 from base import train
@@ -17,14 +17,9 @@ actor, critic = ModelFactory.create_model(env_name, hyperparameters["device"], h
 
 loss_calculator = LossFactory.create_loss_calculator(hyperparameters["loss"], hyperparameters["gamma"])
 
-env = gym.make(hyperparameters["env_name"], 
-               render_mode=hyperparameters["render_mode"])
-
 base_path = f"trials/{env_name}/{hyperparameters['loss']}/trial_data/trial_{hyperparameters['trial_number']}"
 
-num_actors = hyperparameters["num_actors"]
-
-env = gym.wrappers.RecordVideo(env, f"{base_path}/video/", episode_trigger=lambda t: t % (num_actors*25) == 0)
+env = EnvFactory.create_env(hyperparameters, base_path, train=True)
 
 optimizer = optim.Adam(list(actor.parameters()) + list(critic.parameters()), lr=hyperparameters["lr"])
 
@@ -33,7 +28,7 @@ obj_func_hist, losses, ppo_loss, critic_loss = train(env,
                               critic,
                               optimizer,
                               hyperparameters["num_episodes"],
-                              num_actors,
+                              hyperparameters["num_actors"],
                               hyperparameters["num_epochs"],
                               hyperparameters["eps"],
 							  loss_calculator)
@@ -52,7 +47,7 @@ plots = [(obj_func_hist, "/rewards", "Reward Projection", "Reward"),
 for data, name, title, y_label in plots:
     dump_to_pickle(data, f"{base_path}/pickles/{name}.pkl")   
     
-
+    
 torch.save(actor.state_dict(), f"{base_path}/save/actor_weights.pt")
 torch.save(critic.state_dict(), f"{base_path}/save/critic_weights.pt")
 

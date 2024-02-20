@@ -68,13 +68,15 @@ class __Base_model__(nn.Module):
 
 class Actor(__Base_model__):
 
-    def __init__(self, device, mode):
-        super(Actor, self).__init__(device, mode)
+    def __init__(self, device, _):
+        super(Actor, self).__init__(device, "state_action")
 
 
     def final_activation(self, x):
         return F.log_softmax(x, dim=1)
     
+
+    # TODO: these two functions could be placed in a common actor base class
 
     def act(self, state):
 
@@ -83,6 +85,12 @@ class Actor(__Base_model__):
         probs = Categorical(logits=probabilities)
         action = probs.sample()
         return action.item(), probabilities[0, action]
+    
+
+    def follow_policy(self, x):
+        probs = self.forward(x)
+        action = torch.argmax(probs).detach()
+        return int(action), probs[0, action]
     
 
     def normalize_state(self, state):
@@ -102,7 +110,7 @@ class Actor(__Base_model__):
             yield state
     
 
-    def collect_episode(self, env):
+    def collect_episode(self, env, on_policy):
 
         terminated = False
         truncated = False
@@ -116,8 +124,11 @@ class Actor(__Base_model__):
             state = self.normalize_state(new_state)
             state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
             
-            action, probs = self.act(state)
-
+            if on_policy:
+                action, probs = self.follow_policy(state)
+            else:
+                action, probs = self.act(state)
+                
             new_state, reward, terminated, truncated, info = env.step(action)
 
             states.append(state), actions.append(action), probs_list.append(probs), rewards.append(reward)
