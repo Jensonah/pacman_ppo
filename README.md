@@ -6,5 +6,3 @@ I write the Reinforce, A2C and PPO algorithms from scratch and apply them to the
 The final product is my PPO algorithm applied to the Pacman Atari environment.
 This repository then also is a snapshot on how I study new topics, which is a continuous cycle of reading tutorials, literature analysis and writing my own implementations from scratch. 
 All this while keeping track of useful links and notes in my personal notes file.
-
-Please note that this is a hobby project, the code is messy. Not much refactoring is done. We want to get a proof of concept asap. 
