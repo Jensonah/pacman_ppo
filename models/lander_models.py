@@ -107,7 +107,7 @@ class Actor(__Base_model__):
     def states_generator(self, states):
 
         for state in states:
-            yield state
+            yield torch.Tensor(state).to(self.device)
     
 
     def collect_episode(self, env, on_policy):

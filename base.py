@@ -17,8 +17,8 @@ def get_standardized_tensor(xs):
 
 def get_probs(actor, states, actions):
     all_probs = torch.cat([actor.forward(state) for state in states])
-    actions = torch.Tensor(actions).int()
-    out = all_probs[torch.arange(all_probs.size(0)), actions]
+    actions = torch.Tensor(actions).int().to(actor.device)
+    out = all_probs[torch.arange(all_probs.size(0)), actions].to(actor.device)
     # the line above does the line below more efficiently
     #[all_probs[i][actions[i]].unsqueeze(0) for i in range(len(actions))]
     return out

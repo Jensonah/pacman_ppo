@@ -148,7 +148,7 @@ class Actor(Base_model):
 
         for frame in frames:
             state_repr = torch.cat((state_repr, frame))
-            model_ready_state = state_repr.unsqueeze(0)
+            model_ready_state = state_repr.unsqueeze(0).to(self.device)
 
             yield model_ready_state
 
