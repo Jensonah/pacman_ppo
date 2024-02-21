@@ -97,9 +97,9 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                 loss.backward()
                 optim.step()
 
-                losses_k.append(loss.detach()/num_actors)
-                ppo_losses_k.append(ppo_loss.detach()/num_actors)
-                critic_losses_k.append(critic_loss.detach()/num_actors)
+                losses_k.append(loss.cpu().detach()/num_actors)
+                ppo_losses_k.append(ppo_loss.cpu().detach()/num_actors)
+                critic_losses_k.append(critic_loss.cpu().detach()/num_actors)
             
             losses.append(pack_data(losses_k))
             ppo_losses.append(pack_data(ppo_losses_k))
