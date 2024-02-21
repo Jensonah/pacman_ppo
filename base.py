@@ -69,7 +69,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                     # TODO: see if we can batch the forwards here
                     critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
                     
-                    loss_calculator.update_losses(critic_values, actions, rewards)
+                    loss_calculator.update_losses(critic_values, actions, rewards, actor.device)
                     critic_loss += loss_calculator.get_critic_loss()
                     advantage = loss_calculator.get_advantage()
 

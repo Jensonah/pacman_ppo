@@ -15,6 +15,9 @@ env_name = hyperparameters["env_name"]
 
 actor, critic = ModelFactory.create_model(env_name, hyperparameters["device"], hyperparameters['mode'])
 
+actor.to(actor.device)
+critic.to(critic.device)
+
 loss_calculator = LossFactory.create_loss_calculator(hyperparameters["loss"], hyperparameters["gamma"])
 
 base_path = f"trials/{env_name}/{hyperparameters['loss']}/trial_data/trial_{hyperparameters['trial_number']}"

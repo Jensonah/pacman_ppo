@@ -15,10 +15,10 @@ class PPO_loss_calculator():
 		self.retrieved_advantage = False
 
 	
-	def update_losses(self, critic_values, _, rewards):
+	def update_losses(self, critic_values, _, rewards, device):
 		
 		self.critic_values_t = critic_values
-		self.critic_values_t1 = torch.cat((critic_values.clone()[1:], torch.zeros(1,1)))
+		self.critic_values_t1 = torch.cat((critic_values.clone()[1:], torch.zeros(1,1).to(device)))
 
 		self.rewards = rewards
 
