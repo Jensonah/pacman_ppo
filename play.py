@@ -4,7 +4,7 @@ import torch
 from env_factory import EnvFactory
 from tqdm import tqdm
 
-base_path = "trials/LunarLander-v2/ppo/trial_data/trial_0_for_compare"
+base_path = "trials/LunarLander-v2/ppo_q/trial_data/trial_0_for_compare"
 
 hyperparameters = json.load(open(f"{base_path}/hyperparameters.json"))
 
@@ -12,14 +12,16 @@ hyperparameters["num_actors"] = 1
 
 actor, _ = ModelFactory.create_model(hyperparameters['env_name'], hyperparameters['device'], hyperparameters['mode'])
 
-actor.load_state_dict(torch.load(f"{base_path}/save/actor_weights.pt"))
+actor.load_state_dict(torch.load(f"{base_path}/save/actor_weights.pt", map_location=hyperparameters['device']))
 
 env = EnvFactory.create_env(hyperparameters, base_path, train=False)
 
 episodes = []
 
-for _ in tqdm(range(250)):
+for _ in tqdm(range(5)):
 	episodes.append(actor.collect_episode(env, on_policy=True))
+	print(len(episodes[-1][-1]))
+
 
 env.close()
 

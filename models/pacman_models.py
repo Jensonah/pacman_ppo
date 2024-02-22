@@ -119,6 +119,7 @@ class Actor(Base_model):
 
     def follow_policy(self, x):
         probs = self.forward(x)
+        # print(torch.exp(probs))
         action = torch.argmax(probs).detach()
         return int(action), probs[0, action]
     

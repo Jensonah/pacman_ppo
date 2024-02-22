@@ -1,0 +1,1 @@
+{"num_episodes": 200, "gamma": 0.99, "lr": 0.0001, "env_name": "ALE/MsPacman-v5", "render_mode": "rgb_array", "trial_number": "1", "eps": 0.2, "num_epochs": 5, "num_actors": 3, "device": "cpu", "loss": "ppo_q", "mode": "state_action", "frameskip": 4, "repeat_action_probability": 0.2, "obs_type": "rgb"}
