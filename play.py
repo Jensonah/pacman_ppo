@@ -4,7 +4,7 @@ import torch
 from env_factory import EnvFactory
 from tqdm import tqdm
 
-base_path = "trials/LunarLander-v2/ppo_q/trial_data/trial_0_for_compare"
+base_path = f"trials/ALE/MsPacman-v5/ppo_q/trial_data/trial_3"
 
 hyperparameters = json.load(open(f"{base_path}/hyperparameters.json"))
 

@@ -18,13 +18,13 @@ def plot_fancy_loss(df, path, title, y_label):
     # Plot means
     plt.plot(xs, means,     color='blue', linestyle='solid', alpha=0.8)
 
-    if title == "Reward Projection":
-        line_200 =  [200 for _ in range(len(means))]
-        line_0   =  [0   for _ in range(len(means))]
-        plt.plot(xs, line_200,  color='red',  linestyle='dashed', alpha=0.3)
-        plt.plot(xs, line_0,    color='red',  linestyle='dashed', alpha=0.3)
-        ax = plt.gca()
-        ax.set_ylim([-750, 350])
+    # if title == "Reward Projection":
+    #     line_200 =  [200 for _ in range(len(means))]
+    #     line_0   =  [0   for _ in range(len(means))]
+    #     plt.plot(xs, line_200,  color='red',  linestyle='dashed', alpha=0.3)
+    #     plt.plot(xs, line_0,    color='red',  linestyle='dashed', alpha=0.3)
+    #     ax = plt.gca()
+    #     ax.set_ylim([-750, 350])
 
 
     # Plot range
