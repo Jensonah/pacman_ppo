@@ -18,23 +18,23 @@ class Base_model(nn.Module):
         # Reasoning being that on all channels the same kernels will work, and their wouldn't be a need to learn
         # different kernels for each frame
 
-        self.conv1 = nn.Conv2d(3*no_frames, 3*no_frames, (5,5), groups=1, stride=(2,2))
+        self.conv1 = nn.Conv2d(3*no_frames, 9*no_frames, (7,7), groups=1, stride=(2,2))
         nn.init.kaiming_uniform_(self.conv1.weight)
         self.conv1.bias.data.fill_(0.01)
         
-        self.conv2 = nn.Conv2d(3*no_frames, 2*no_frames, (5,5), groups=1, stride=(1,1))
+        self.conv2 = nn.Conv2d(9*no_frames, 6*no_frames, (7,7), groups=1, stride=(1,1))
         nn.init.kaiming_uniform_(self.conv2.weight)
         self.conv2.bias.data.fill_(0.01)
         
-        self.conv3 = nn.Conv2d(2*no_frames, no_frames, (5,5), groups=1, stride=(1,1))
+        self.conv3 = nn.Conv2d(6*no_frames, 3*no_frames, (7,7), groups=1, stride=(1,1))
         nn.init.kaiming_uniform_(self.conv3.weight)
         self.conv3.bias.data.fill_(0.01)
         
-        self.conv4 = nn.Conv2d(no_frames, no_frames, (5,5), groups=1, stride=(1,1))
+        self.conv4 = nn.Conv2d(3*no_frames, no_frames, (7,7), groups=1, stride=(1,1))
         nn.init.kaiming_uniform_(self.conv4.weight)
         self.conv4.bias.data.fill_(0.01)
         
-        self.conv5 = nn.Conv2d(no_frames, 1, (5,5), groups=1, stride=(1,1))
+        self.conv5 = nn.Conv2d(no_frames, 1, (7,7), groups=1, stride=(1,1))
         nn.init.kaiming_uniform_(self.conv5.weight)
         self.conv5.bias.data.fill_(0.01)
         
