@@ -33,6 +33,7 @@ obj_func_hist, losses, ppo_loss, critic_loss = train(env,
                               hyperparameters["num_episodes"],
                               hyperparameters["num_actors"],
                               hyperparameters["num_epochs"],
+                              hyperparameters["num_replay_episodes"],
                               hyperparameters["eps"],
 							  loss_calculator)
 

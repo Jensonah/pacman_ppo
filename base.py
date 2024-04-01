@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from tqdm import tqdm
+from heapq import *
 
 
 def pack_data(data):
@@ -24,7 +25,7 @@ def get_probs(actor, states, actions):
     return out
 
 
-def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, loss_calculator):
+def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_replay_episodes, eps, loss_calculator):
 
     # We wrap our training in an try-except block such that we can do a Keyboard interrupt
     # without losing our progress
@@ -37,6 +38,8 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
         critic_losses = []
 
         pbar = tqdm(range(num_episodes))
+
+        replay_episodes = []
 
         for i in pbar:
 
@@ -65,10 +68,10 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                 for j in range(num_actors):
 
                     compressed_states, states_generator, actions, original_probs, rewards = episodes[j]
-
+                    
                     # TODO: see if we can batch the forwards here
                     critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
-                    
+                      
                     loss_calculator.update_losses(critic_values, actions, rewards, actor.device)
                     critic_loss += loss_calculator.get_critic_loss()
                     advantage = loss_calculator.get_advantage()
@@ -90,6 +93,14 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                     ppo_gradient *= -1 # we invert our loss since torch minimizes
 
                     ppo_loss += torch.mean(ppo_gradient)# mean to normalize by length
+
+                # we only use replay for the critic
+                for replay_episode in replay_episodes:
+                    score, episode = replay_episode
+                    compressed_states, states_generator, actions, rewards = episode
+                    critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
+                    loss_calculator.update_losses(critic_values, actions, rewards, actor.device)
+                    critic_loss += loss_calculator.get_critic_loss()
                 
                 loss = ppo_loss + critic_loss
 
@@ -100,6 +111,20 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, eps, 
                 losses_k.append(loss.cpu().detach()/num_actors)
                 ppo_losses_k.append(ppo_loss.cpu().detach()/num_actors)
                 critic_losses_k.append(critic_loss.cpu().detach()/num_actors)
+
+            # update best replay episodes
+            if num_replay_episodes > 0:
+                for j in range(num_actors):
+                    compressed_states, states_generator, actions, _, rewards_non_processed = non_processed_episodes[j]
+                    score = sum(rewards_non_processed)
+                    _, _, _, _, rewards = episodes[j]
+                    tup = (score, (compressed_states, states_generator, actions, rewards))
+                    if len(replay_episodes) < num_replay_episodes:
+                        heappush(replay_episodes, tup)
+                    else:
+                        if score > replay_episodes[0][0]:
+                            heappop(replay_episodes)
+                            heappush(replay_episodes, tup)
             
             losses.append(pack_data(losses_k))
             ppo_losses.append(pack_data(ppo_losses_k))

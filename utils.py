@@ -24,7 +24,7 @@ def plot_fancy_loss(df, path, title, y_label):
         plt.plot(xs, line_200,  color='red',  linestyle='dashed', alpha=0.3)
         plt.plot(xs, line_0,    color='red',  linestyle='dashed', alpha=0.3)
         ax = plt.gca()
-        #ax.set_ylim([-0.5, 2.5])
+        ax.set_ylim([-750, 350])
 
 
     # Plot range
