@@ -4,7 +4,7 @@ import torch
 from env_factory import EnvFactory
 from tqdm import tqdm
 
-base_path = f"trials/ALE/MsPacman-v5/ppo_q/trial_data/trial_3"
+base_path = f"trials/LunarLander-v2/ppo_q/trial_data/trial_0_replay_for_compare"
 
 hyperparameters = json.load(open(f"{base_path}/hyperparameters.json"))
 
@@ -18,9 +18,11 @@ env = EnvFactory.create_env(hyperparameters, base_path, train=False)
 
 episodes = []
 
-for _ in tqdm(range(5)):
+# To change render mode see envFactory class
+for _ in tqdm(range(250)):
 	episodes.append(actor.collect_episode(env, on_policy=True))
-	print(len(episodes[-1][-1]))
+	rewards = episodes[-1][-1]
+	#print(sum(rewards))
 
 
 env.close()

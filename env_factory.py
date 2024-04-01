@@ -12,7 +12,7 @@ class EnvFactory():
 			out_path = f"{base_path}/video_train/"
 			video_trigger = 25
 		else:
-			render_mode = "human"
+			render_mode = "None" # "Human"
 			out_path = f"{base_path}/video_on_policy/"
 			video_trigger = 1
 
