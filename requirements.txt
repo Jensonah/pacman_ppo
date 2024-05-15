@@ -57,3 +57,4 @@ tqdm==4.66.1
 triton==2.1.0
 typing_extensions==4.8.0
 urllib3==2.1.0
+pandas

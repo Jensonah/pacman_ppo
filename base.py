@@ -59,12 +59,19 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_r
             ppo_losses_k = []
             critic_losses_k = []
 
+            # We will update our models with mini-batches instead of all episodes at the same time
+            # We expect that this will improve both computation and convergence time
+            # This comes at the cost that now for each state we estimate its value twice instead of once, 
+            # but this could also contribute to the aforementioned advantages 
+            # We will also have to reimplement replay
+
             for k in range(num_epochs):
 
                 loss = 0
                 ppo_loss = 0
                 critic_loss = 0
 
+                # Here we should take random timesteps from random actors
                 for j in range(num_actors):
 
                     compressed_states, states_generator, actions, original_probs, rewards = episodes[j]
@@ -93,14 +100,6 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_r
                     ppo_gradient *= -1 # we invert our loss since torch minimizes
 
                     ppo_loss += torch.mean(ppo_gradient)# mean to normalize by length
-
-                # we only use replay for the critic
-                for replay_episode in replay_episodes:
-                    score, episode = replay_episode
-                    compressed_states, states_generator, actions, rewards = episode
-                    critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
-                    loss_calculator.update_losses(critic_values, actions, rewards, actor.device)
-                    critic_loss += loss_calculator.get_critic_loss()
                 
                 loss = ppo_loss + critic_loss
 
@@ -111,20 +110,6 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_r
                 losses_k.append(loss.cpu().detach()/num_actors)
                 ppo_losses_k.append(ppo_loss.cpu().detach()/num_actors)
                 critic_losses_k.append(critic_loss.cpu().detach()/num_actors)
-
-            # update best replay episodes
-            if num_replay_episodes > 0:
-                for j in range(num_actors):
-                    compressed_states, states_generator, actions, _, rewards_non_processed = non_processed_episodes[j]
-                    score = sum(rewards_non_processed)
-                    _, _, _, _, rewards = episodes[j]
-                    tup = (score, (compressed_states, states_generator, actions, rewards))
-                    if len(replay_episodes) < num_replay_episodes:
-                        heappush(replay_episodes, tup)
-                    else:
-                        if score > replay_episodes[0][0]:
-                            heappop(replay_episodes)
-                            heappush(replay_episodes, tup)
             
             losses.append(pack_data(losses_k))
             ppo_losses.append(pack_data(ppo_losses_k))
