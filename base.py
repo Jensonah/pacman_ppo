@@ -79,7 +79,6 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_r
 
                     compressed_states, states_generator, actions, original_probs, rewards = episodes[j]
                     
-                    # TODO: see if we can batch the forwards here
                     #critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
                     critic_values  = critic(torch.cat([state for state in states_generator(compressed_states)]))
                       
@@ -150,7 +149,7 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_r
                 #     critic_values_t1 = critic(state_t1)
 
 
-                
+
             
             losses.append(pack_data(losses_k))
             ppo_losses.append(pack_data(ppo_losses_k))
