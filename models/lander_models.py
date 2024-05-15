@@ -104,6 +104,11 @@ class Actor(__Base_model__):
         
         return state
     
+
+    def state_generator(self, state):
+        return torch.Tensor(state).to(self.device)
+    
+    
     def states_generator(self, states):
 
         for state in states:

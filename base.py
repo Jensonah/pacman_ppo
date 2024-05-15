@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from heapq import *
+import random
 
 
 def pack_data(data):
@@ -29,6 +30,8 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_r
 
     # We wrap our training in an try-except block such that we can do a Keyboard interrupt
     # without losing our progress
+
+    state_generator = actor.state_generator
 
     try:
 
@@ -77,7 +80,8 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_r
                     compressed_states, states_generator, actions, original_probs, rewards = episodes[j]
                     
                     # TODO: see if we can batch the forwards here
-                    critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
+                    #critic_values  = torch.cat([critic(state) for state in states_generator(compressed_states)])
+                    critic_values  = critic(torch.cat([state for state in states_generator(compressed_states)]))
                       
                     loss_calculator.update_losses(critic_values, actions, rewards, actor.device)
                     critic_loss += loss_calculator.get_critic_loss()
@@ -110,6 +114,43 @@ def train(env, actor, critic, optim, num_episodes, num_actors, num_epochs, num_r
                 losses_k.append(loss.cpu().detach()/num_actors)
                 ppo_losses_k.append(ppo_loss.cpu().detach()/num_actors)
                 critic_losses_k.append(critic_loss.cpu().detach()/num_actors)
+
+                # new loop
+                # idxs = [(i,j) for i in range(num_actors) for j in range(len(num_episodes[i]))]
+                # random.shuffle(idxs)
+
+                # for batch_start in range(0, len(idxs), batch_size):
+
+                #     null_entries = []
+                #     states = []
+                #     states_t1 = []
+
+                #     batch_end = min(batch_start + batch_size, len(idxs)-1)
+                #     for k in range(batch_start, batch_end):
+                        
+                #         i, j = idxs[k]
+
+                #         compressed_state, _, action, original_probs, reward = episodes[i][j]
+                #         state = actor.state_generator(state)
+                #         states.append(state)
+
+                #         if j != len(episodes[i]) - 1:
+                #             compressed_state_t1, _, _, _, _ = episodes[i][j+1]
+                #             state_t1 = actor.state_generator(state)  
+                #         else:
+                #             state_t1 = torch.zeros(4)
+                #             null_entries.append((i,j))
+
+                #         states_t1.append(states_t1)
+                    
+                #     states = torch.cat(states)
+                #     states_t1 = torch.cat(states_t1)
+
+                #     critic_values = critic(states)
+                #     critic_values_t1 = critic(state_t1)
+
+
+                
             
             losses.append(pack_data(losses_k))
             ppo_losses.append(pack_data(ppo_losses_k))
