@@ -47,3 +47,7 @@ def dump_to_pickle(data, path):
 def load_pickle(path):
     df = pd.read_pickle(path)
     return df
+
+
+def flatten(xss):
+    return [x for xs in xss for x in xs]

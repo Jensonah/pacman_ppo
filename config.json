@@ -14,5 +14,6 @@
     "mode" : "state_action",
     "frameskip" : 4,
 	"repeat_action_probability": 0.2,
-    "obs_type" : "rgb"
+    "obs_type" : "rgb",
+    "batch_size" : 32
 }

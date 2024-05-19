@@ -8,6 +8,8 @@ from models.model_factory import ModelFactory
 from losses.loss_factory import LossFactory
 from utils import dump_to_pickle
 
+# TODO: remove
+torch.autograd.set_detect_anomaly(True)
 
 hyperparameters = json.load(open("config.json"))
 
@@ -35,7 +37,8 @@ obj_func_hist, losses, ppo_loss, critic_loss = train(env,
                               hyperparameters["num_epochs"],
                               hyperparameters["num_replay_episodes"],
                               hyperparameters["eps"],
-							  loss_calculator)
+							  loss_calculator,
+                              hyperparameters["batch_size"])
 
 # check if directory exist, if not, make it
 Path(f"{base_path}/save/").mkdir(parents=True, exist_ok=True)

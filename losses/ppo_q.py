@@ -18,12 +18,12 @@ class PPO_Q_loss_calculator():
 		self.retrieved_advantage = False
 
 	
-	def update_losses(self, critic_values, actions, rewards, device):
+	def update_losses(self, critic_values, actions, rewards, critic_values_t1, device):
 
 		len_episode = len(actions)
 		
 		self.critic_values_best_t = torch.max(critic_values, 1).values.unsqueeze(1)
-		self.critic_values_best_t1 = torch.cat((self.critic_values_best_t.clone()[1:], torch.zeros(1,1).to(device)))
+		self.critic_values_best_t1 = torch.max(critic_values_t1, 1).values.unsqueeze(1)
 		
 		# Here we index for each state the value of that state paired with the action taken
 		self.critic_values_action_t = critic_values[torch.arange(len_episode), actions].unsqueeze(1)

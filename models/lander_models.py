@@ -121,13 +121,14 @@ class Actor(__Base_model__):
         truncated = False
 
         new_state, info = env.reset()
+        new_state = self.normalize_state(new_state)
+        new_state = torch.from_numpy(new_state).float().unsqueeze(0).to(self.device)
 
-        states, actions, probs_list, rewards = [], [], [], []
+        episode = []
 
         while not (terminated or truncated):
 
-            state = self.normalize_state(new_state)
-            state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
+            state = new_state
             
             if on_policy:
                 action, probs = self.follow_policy(state)
@@ -136,13 +137,16 @@ class Actor(__Base_model__):
                 
             new_state, reward, terminated, truncated, info = env.step(action)
 
-            states.append(state), actions.append(action), probs_list.append(probs), rewards.append(reward)
+            new_state = self.normalize_state(new_state)
+            new_state = torch.from_numpy(new_state).float().unsqueeze(0).to(self.device)
+
+            episode.append((state, action, probs, reward, new_state))
 
         # Probably unnecessary
         # if truncated:
         #     rewards[-1] -= 50
 
-        return (states, self.states_generator, actions, probs_list, rewards)
+        return episode
     
 
 class Critic(__Base_model__):
