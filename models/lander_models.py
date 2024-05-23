@@ -124,6 +124,8 @@ class Actor(__Base_model__):
         new_state = self.normalize_state(new_state)
         new_state = torch.from_numpy(new_state).float().unsqueeze(0).to(self.device)
 
+        temp = None
+
         episode = []
 
         while not (terminated or truncated):
@@ -134,13 +136,18 @@ class Actor(__Base_model__):
                 action, probs = self.follow_policy(state)
             else:
                 action, probs = self.act(state)
+
+            if temp:
+                episode.append((temp[0], temp[1], temp[2], temp[3], temp[4], action, temp[5]))
                 
             new_state, reward, terminated, truncated, info = env.step(action)
 
             new_state = self.normalize_state(new_state)
             new_state = torch.from_numpy(new_state).float().unsqueeze(0).to(self.device)
 
-            episode.append((state, action, probs, reward, new_state))
+            temp = (state, action, probs, reward, new_state, terminated)
+
+        episode.append((temp[0], temp[1], temp[2], temp[3], temp[4], 0, temp[5]))
 
         # Probably unnecessary
         # if truncated:
