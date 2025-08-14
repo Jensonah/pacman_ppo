@@ -5,12 +5,10 @@ from torch.distributions import Categorical
 
 
 class __Base_model__(nn.Module):
-    
     def __init__(self, device, mode):
         super(__Base_model__, self).__init__()
 
-        mode_dict = {'state_only' : 1, 
-                     'state_action' : 4}
+        mode_dict = {"state_only": 1, "state_action": 4}
 
         self.fc1 = nn.Linear(8, 256)
         nn.init.kaiming_uniform_(self.fc1.weight)
@@ -38,13 +36,10 @@ class __Base_model__(nn.Module):
 
         self.device = device
 
-
     def final_activation(self, x):
         raise NotImplementedError("Final activation not implemented in base class")
-        
 
     def forward(self, x):
-
         x = self.fc1(x)
         x = F.relu(x)
 
@@ -64,34 +59,28 @@ class __Base_model__(nn.Module):
         x = self.final_activation(x)
 
         return x
-    
+
 
 class Actor(__Base_model__):
-
     def __init__(self, device, _):
         super(Actor, self).__init__(device, "state_action")
 
-
     def final_activation(self, x):
         return F.log_softmax(x, dim=1)
-    
 
     # TODO: these two functions could be placed in a common actor base class
 
     def act(self, state):
-
         probabilities = self.forward(state)
 
         probs = Categorical(logits=probabilities)
         action = probs.sample()
         return action.item(), probabilities[0, action]
-    
 
     def follow_policy(self, x):
         probs = self.forward(x)
         action = torch.argmax(probs).detach()
         return int(action), probs[0, action]
-    
 
     def normalize_state(self, state):
         state[0] /= 1.5
@@ -99,24 +88,19 @@ class Actor(__Base_model__):
         state[2] /= 5.0
         state[3] /= 5.0
         state[4] /= 3.1415927
-        state[5] /= 5.0	
+        state[5] /= 5.0
         # idx 6 and 7 are bools
-        
+
         return state
-    
 
     def state_generator(self, state):
         return torch.Tensor(state).to(self.device)
-    
-    
-    def states_generator(self, states):
 
+    def states_generator(self, states):
         for state in states:
             yield torch.Tensor(state).to(self.device)
-    
 
     def collect_episode(self, env, on_policy):
-
         terminated = False
         truncated = False
 
@@ -129,9 +113,8 @@ class Actor(__Base_model__):
         episode = []
 
         while not (terminated or truncated):
-
             state = new_state
-            
+
             if on_policy:
                 action, probs = self.follow_policy(state)
             else:
@@ -139,7 +122,7 @@ class Actor(__Base_model__):
 
             if temp:
                 episode.append((temp[0], temp[1], temp[2], temp[3], temp[4], action, temp[5]))
-                
+
             new_state, reward, terminated, truncated, info = env.step(action)
 
             new_state = self.normalize_state(new_state)
@@ -154,13 +137,11 @@ class Actor(__Base_model__):
         #     rewards[-1] -= 50
 
         return episode
-    
+
 
 class Critic(__Base_model__):
-
     def __init__(self, device, mode):
         super(Critic, self).__init__(device, mode)
-        
 
     def final_activation(self, x):
         return x

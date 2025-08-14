@@ -1,5 +1,5 @@
 {
-    "num_episodes" : 1000,
+    "num_episodes" : 100,
     "gamma" : 0.999,
     "lr" : 2.5e-4,
     "env_name" : "LunarLander-v2",
