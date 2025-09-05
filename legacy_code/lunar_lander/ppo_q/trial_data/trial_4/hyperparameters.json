@@ -1,1 +1,0 @@
-{"num_episodes": 300, "gamma": 0.99, "lr": 5e-05, "env_name": "LunarLander-v2", "render_mode": "rgb_array", "trial_number": 4, "eps": 0.2, "num_epochs": 10, "num_actors": 5, "device": "cpu"}
