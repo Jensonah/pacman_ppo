@@ -4,9 +4,9 @@ import pandas as pd
 
 
 def plot_fancy_loss(df, path, title, y_label):
-    means = np.squeeze(df[["means"]].values)
-    mins = np.squeeze(df[["mins"]].values)
-    maxes = np.squeeze(df[["maxes"]].values)
+    means = np.squeeze(df[["mean"]].values)
+    mins = np.squeeze(df[["min"]].values)
+    maxes = np.squeeze(df[["max"]].values)
 
     plt.clf()
 
@@ -42,11 +42,6 @@ def plot_fancy_loss(df, path, title, y_label):
 def dump_to_pickle(data, path):
     df = pd.DataFrame(data, columns=["means", "mins", "maxes"])
     df.to_pickle(path)
-
-
-def load_pickle(path):
-    df = pd.read_pickle(path)
-    return df
 
 
 def flatten(xss):

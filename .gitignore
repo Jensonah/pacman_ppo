@@ -1,4 +1,5 @@
 env
+trials
 venv
 .vscode
 **/__pycache__/

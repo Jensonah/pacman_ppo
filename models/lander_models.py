@@ -3,38 +3,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
+from data_models import Experience
+
 
 class __Base_model__(nn.Module):
-    def __init__(self, device, mode):
+    def __init__(self, device, mode, lr):
         super(__Base_model__, self).__init__()
 
         mode_dict = {"state_only": 1, "state_action": 4}
 
-        self.fc1 = nn.Linear(8, 256)
-        nn.init.kaiming_uniform_(self.fc1.weight)
-        self.fc1.bias.data.fill_(0.01)
+        self.fc1 = nn.Linear(8, 64)
 
-        self.fc2 = nn.Linear(256, 512)
-        nn.init.kaiming_uniform_(self.fc2.weight)
-        self.fc2.bias.data.fill_(0.01)
+        self.fc2 = nn.Linear(64, 64)
 
-        self.fc3 = nn.Linear(512, 256)
-        nn.init.kaiming_uniform_(self.fc3.weight)
-        self.fc3.bias.data.fill_(0.01)
-
-        self.fc4 = nn.Linear(256, 128)
-        nn.init.kaiming_uniform_(self.fc4.weight)
-        self.fc4.bias.data.fill_(0.01)
-
-        self.fc5 = nn.Linear(128, 128)
-        nn.init.kaiming_uniform_(self.fc5.weight)
-        self.fc5.bias.data.fill_(0.01)
-
-        self.fc6 = nn.Linear(128, mode_dict[mode])
-        nn.init.xavier_uniform_(self.fc6.weight)
-        self.fc6.bias.data.fill_(0.01)
+        self.fc3 = nn.Linear(64, mode_dict[mode])
 
         self.device = device
+
+        self.optim = torch.optim.Adam(self.parameters(), lr)
 
     def final_activation(self, x):
         raise NotImplementedError("Final activation not implemented in base class")
@@ -47,101 +33,109 @@ class __Base_model__(nn.Module):
         x = F.relu(x)
 
         x = self.fc3(x)
-        x = F.relu(x)
-
-        x = self.fc4(x)
-        x = F.relu(x)
-
-        x = self.fc5(x)
-        x = F.relu(x)
-
-        x = self.fc6(x)
         x = self.final_activation(x)
 
         return x
 
 
 class Actor(__Base_model__):
-    def __init__(self, device, _):
-        super(Actor, self).__init__(device, "state_action")
+    def __init__(self, device, lr):
+        super().__init__(device, "state_action", lr)
 
-    def final_activation(self, x):
-        return F.log_softmax(x, dim=1)
+    def update(
+        self, batch: list[Experience], all_probs, value_states, value_states_t1, eps, gamma
+    ) -> float:
+        orig_probs = torch.tensor([exp.orig_prob for exp in batch])
 
-    # TODO: these two functions could be placed in a common actor base class
+        actions = torch.tensor([exp.action for exp in batch]).to(self.device).unsqueeze(1)
+        action_probs = all_probs.gather(1, actions).squeeze(1)
 
-    def act(self, state):
-        probabilities = self.forward(state)
+        diff = torch.exp(action_probs - orig_probs)
 
-        probs = Categorical(logits=probabilities)
-        action = probs.sample()
-        return action.item(), probabilities[0, action]
+        clamped_diff = torch.clamp(diff, 1 - eps, 1 + eps)
 
-    def follow_policy(self, x):
-        probs = self.forward(x)
-        action = torch.argmax(probs).detach()
-        return int(action), probs[0, action]
+        rewards = [exp.reward for exp in batch]
+        rewards_t = torch.tensor(rewards, dtype=torch.float32).to(self.device).unsqueeze(1)
 
-    def normalize_state(self, state):
-        state[0] /= 1.5
-        state[1] /= 1.5
-        state[2] /= 5.0
-        state[3] /= 5.0
-        state[4] /= 3.1415927
-        state[5] /= 5.0
-        # idx 6 and 7 are bools
+        terminated = [exp.terminated for exp in batch]
+        terminated_t = torch.tensor(terminated, dtype=torch.float).to(self.device).unsqueeze(1)
 
-        return state
+        # How should I handle truncated?
+        advantage = rewards_t + gamma * value_states_t1 * (1 - terminated_t) - value_states
+        advantage_d = advantage.detach()
 
-    def state_generator(self, state):
-        return torch.Tensor(state).to(self.device)
+        loss = torch.min(diff * advantage_d, clamped_diff * advantage_d)
+        loss = -torch.mean(loss)
 
-    def states_generator(self, states):
-        for state in states:
-            yield torch.Tensor(state).to(self.device)
+        self.optim.zero_grad()
+        loss.backward()
+        self.optim.step()
 
-    def collect_episode(self, env, on_policy):
-        terminated = False
-        truncated = False
-
-        new_state, info = env.reset()
-        new_state = self.normalize_state(new_state)
-        new_state = torch.from_numpy(new_state).float().unsqueeze(0).to(self.device)
-
-        temp = None
-
-        episode = []
-
-        while not (terminated or truncated):
-            state = new_state
-
-            if on_policy:
-                action, probs = self.follow_policy(state)
-            else:
-                action, probs = self.act(state)
-
-            if temp:
-                episode.append((temp[0], temp[1], temp[2], temp[3], temp[4], action, temp[5]))
-
-            new_state, reward, terminated, truncated, info = env.step(action)
-
-            new_state = self.normalize_state(new_state)
-            new_state = torch.from_numpy(new_state).float().unsqueeze(0).to(self.device)
-
-            temp = (state, action, probs, reward, new_state, terminated)
-
-        episode.append((temp[0], temp[1], temp[2], temp[3], temp[4], 0, temp[5]))
-
-        # Probably unnecessary
-        # if truncated:
-        #     rewards[-1] -= 50
-
-        return episode
-
-
-class Critic(__Base_model__):
-    def __init__(self, device, mode):
-        super(Critic, self).__init__(device, mode)
+        return float(loss.detach())
 
     def final_activation(self, x):
         return x
+
+    # TODO: these two functions could be placed in a common actor base class
+    # TODO: the update functions should be refactored into an actor/critic base class
+
+    def act(self, state):
+        logits = self.forward(state)
+
+        probs = Categorical(logits=logits)
+        action = probs.sample()
+        return action, probs.log_prob(action)
+
+    def follow_policy(self, x):
+        logits = self.forward(x)
+        action = torch.argmax(logits, dim=1).detach()
+        return int(action), None
+
+    def normalize_state(self, state):
+        shape = state.shape
+        if len(shape) == 2:
+            state[:,0] /= 1.5
+            state[:,1] /= 1.5
+            state[:,2] /= 5.0
+            state[:,3] /= 5.0
+            state[:,4] /= 3.1415927
+            state[:,5] /= 5.0
+            # idx 6 and 7 are bools
+        else:
+            state[0] /= 1.5
+            state[1] /= 1.5
+            state[2] /= 5.0
+            state[3] /= 5.0
+            state[4] /= 3.1415927
+            state[5] /= 5.0
+            # idx 6 and 7 are bools
+
+        return state
+
+
+class Critic(__Base_model__):
+    def __init__(self, device, lr):
+        super().__init__(device, "state_only", lr)
+
+    def final_activation(self, x):
+        return x
+
+    def update(self, batch: list[Experience], value_states, value_states_t1, gamma):
+        rewards = [exp.reward for exp in batch]
+        rewards_t = torch.tensor(rewards, dtype=torch.float32).to(self.device).unsqueeze(1)
+        terminated = [exp.terminated for exp in batch]
+        terminated_t = torch.tensor(terminated, dtype=torch.float).to(self.device).unsqueeze(1)
+
+        # I could detach states_t1
+        value_states_t1 = value_states_t1.detach()
+
+        loss = F.mse_loss(
+            value_states,
+            rewards_t + gamma * value_states_t1 * (1 - terminated_t)
+        )
+
+        self.optim.zero_grad()
+        loss.backward()
+        self.optim.step()
+
+        return float(loss.detach())

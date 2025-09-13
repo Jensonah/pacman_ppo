@@ -50,7 +50,7 @@ class PPO_Q_loss_calculator:
         self.retrieved_critic_loss = self.safety_check(self.retrieved_critic_loss)
 
         return torch.mean(
-            (self.gamma * self.critic_values_best_t1 - (self.critic_values_action_t - self.rewards))
+            (self.gamma * self.critic_values_action_t1 - (self.critic_values_action_t - self.rewards))
             ** 2
         )
 
@@ -59,6 +59,8 @@ class PPO_Q_loss_calculator:
 
         # Here we are comparing two state value estimation, one made one timestep later than the other
         # Their difference is zero if in that timestep we took the optimal action
-        return self.gamma * self.critic_values_action_t1 - (
+        advantage = self.gamma * self.critic_values_action_t1 - (
             self.critic_values_action_t - self.rewards
         )
+        advantage_detached = advantage.detach()
+        return advantage_detached

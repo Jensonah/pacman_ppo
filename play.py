@@ -3,37 +3,42 @@ import json
 import torch
 from tqdm import tqdm
 
+from base2 import collect_episode
+from data_models import TrainConfig
 from env_factory import EnvFactory
 from models.model_factory import ModelFactory
 
-base_path = "trials/LunarLander-v2/ppo_q/trial_data/trial_0_replay_for_compare"
+base_path = "trials/LunarLander-v3/trial_data/trial_test21"
 
-hyperparameters = json.load(open(f"{base_path}/hyperparameters.json"))
+hyperparameters_json = json.load(open("config.json"))
 
-hyperparameters["num_actors"] = 1
+train_config = TrainConfig(**hyperparameters_json)
+train_config.num_parallel_actors = 1
 
-actor, _ = ModelFactory.create_model(
-    hyperparameters["env_name"], hyperparameters["device"], hyperparameters["mode"]
-)
+env_name = train_config.env_name
+
+actor, critic = ModelFactory.create_model(env_name, train_config.device, train_config)
 
 actor.load_state_dict(
-    torch.load(f"{base_path}/save/actor_weights.pt", map_location=hyperparameters["device"])
+    torch.load(f"{base_path}/save/actor_weights.pt", map_location=train_config.device)
 )
 
-env = EnvFactory.create_env(hyperparameters, base_path, train=False)
+env = EnvFactory.create_env(train_config, base_path, train=False)
 
 episodes = []
 
 # To change render mode see envFactory class
-for _ in tqdm(range(250)):
-    episodes.append(actor.collect_episode(env, on_policy=True))
+for _ in tqdm(range(10)):
+    episodes.append(collect_episode(actor, env, on_policy=True))
     rewards = episodes[-1][-1]
     # print(sum(rewards))
 
 
 env.close()
 
-rewards_stats = [sum(rewards) for _, _, _, _, rewards in episodes]
+rewards = [[exp.reward for exp in experience] for experience in episodes]
+
+rewards_stats = [sum(r) for r in rewards]
 
 print(f"Average reward: {sum(rewards_stats) / len(rewards_stats)}")
 print(f"Min reward: {min(rewards_stats)}")
