@@ -1,0 +1,1 @@
+{"num_sample_epochs": 500, "num_ppo_epochs": 5, "num_parallel_actors": 10, "n_replay_epochs": 5, "batch_size": 32, "eps": 0.2, "gamma": 0.999, "device": "cpu", "lr_actor": 0.0001, "lr_critic": 0.0005, "env_name": "LunarLander-v3", "trial_number": "after_refactor1", "frameskip": 4, "repeat_action_probability": 0.2, "obs_type": "rgb"}
