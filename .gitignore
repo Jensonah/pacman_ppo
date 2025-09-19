@@ -1,4 +1,6 @@
 env
 venv
+tmp
+.ruff_cache
 .vscode
 **/__pycache__/

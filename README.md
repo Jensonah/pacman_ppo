@@ -1,8 +1,7 @@
 # pacman_ppo
-A self-study of reinforcement learning, final application to Pacman on Atari.
+A self-study of reinforcement learning, final goal is application to Pacman on Atari.
 
 This repository represents my self-study on reinforcement learning. A topic only briefly touched by my study programs.
-I write the Reinforce, A2C and PPO algorithms from scratch and apply them to the lunar-lander-v2 gymnasium environment.
-The final product is my PPO algorithm applied to the Pacman Atari environment.
-This repository then also is a snapshot on how I study new topics, which is a continuous cycle of reading tutorials, literature analysis and writing my own implementations from scratch. 
-All this while keeping track of useful links and notes in my personal notes file.
+
+Run with:
+`python -m my_ppo.script_name`

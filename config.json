@@ -1,18 +1,17 @@
 {
-    "num_episodes" : 1000,
+    "num_sample_epochs" : 500,
     "gamma" : 0.999,
-    "lr" : 2.5e-4,
-    "env_name" : "LunarLander-v2",
-    "render_mode" : "rgb_array",
-    "trial_number" : "3",
+    "lr_actor" : 1e-4,
+    "lr_critic" : 5e-4,
+    "n_replay_epochs" : 5,
+    "env_name" : "LunarLander-v3",
+    "trial_number" : "trial_replay",
     "eps" : 0.2,
-    "num_epochs" : 5,
-    "num_actors" : 10,
-    "num_replay_episodes" : 5,
+    "num_ppo_epochs" : 5,
+    "num_parallel_actors" : 10,
     "device" : "cpu",
-	"loss" : "ppo_q",
-    "mode" : "state_action",
     "frameskip" : 4,
 	"repeat_action_probability": 0.2,
-    "obs_type" : "rgb"
+    "obs_type" : "rgb",
+    "batch_size" : 32
 }

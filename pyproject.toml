@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 100
+include = ["*.py"]
+
+[tool.ruff.format]
+docstring-code-format = true
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = ["E", "W", "I", "F", "D", "C90", "PGH", "RUF"]
+ignore = ["D10", "RUF010"]
+
+[tool.pyright]
+typeCheckingMode = "basic"
+reportFUnctionMemberAccess = true
+reportPossiblyUnboundVariable = true
+reportIncompatibleMethodOverride = true
